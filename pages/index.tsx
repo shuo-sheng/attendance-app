@@ -353,6 +353,44 @@ export default function AdminDashboard() {
     else loadAll()
   }
 
+  /* ─── Makeup CRUD ─── */
+  async function saveMakeup() {
+    if (!makeupForm.employee_id || !makeupForm.date) return
+    const { error } = await supabase.from('makeup_requests').insert({
+      employee_id: Number(makeupForm.employee_id),
+      date: makeupForm.date,
+      check_in: makeupForm.check_in || null,
+      check_out: makeupForm.check_out || null,
+      reason: makeupForm.reason,
+      status: 'pending'
+    })
+    if (error) { setError(error.message); return }
+    setShowMakeupForm(false)
+    setMakeupForm({ employee_id: '', date: '', check_in: '', check_out: '', reason: '' })
+    loadAll()
+  }
+
+  async function updateMakeupStatus(id: number, status: 'approved' | 'rejected') {
+    const { error } = await supabase.from('makeup_requests').update({ status }).eq('id', id)
+    if (error) setError(error.message)
+    else loadAll()
+  }
+
+  async function deleteMakeup(id: number) {
+    if (!confirm('确定删除这条补卡记录？')) return
+    const { error } = await supabase.from('makeup_requests').delete().eq('id', id)
+    if (error) setError(error.message)
+    else loadAll()
+  }
+
+  function logout() {
+    localStorage.removeItem('attendance_user')
+    router.push('/login')
+  }
+
+  if (authLoading) return <div className="p-8">验证中...</div>
+  if (!user) return null
+
   /* ─── Filters ─── */
   const filteredEmployees = useMemo(() => {
     return employees.filter(e => {
