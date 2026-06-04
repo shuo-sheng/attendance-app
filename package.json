@@ -1,0 +1,22 @@
+{
+  "name": "attendance-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.x",
+    "next": "14.x",
+    "react": "^18",
+    "react-dom": "^18",
+    "recharts": "^3.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "typescript": "^5"
+  }
+}
