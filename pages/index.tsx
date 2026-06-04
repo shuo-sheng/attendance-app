@@ -440,6 +440,12 @@ export default function AdminDashboard() {
       <div className="header glass-panel">
         <h1>📋 考勤管理系统</h1>
         <div className="header-actions">
+          {user && (
+            <span className="user-info">
+              👤 {user.name} ({user.employee_no}) · 
+              <button className="btn-logout" onClick={logout}>退出</button>
+            </span>
+          )}
           <button className="btn-refresh" onClick={loadAll} disabled={loading}>
             {loading ? '⏳' : '🔄'}
           </button>
@@ -460,6 +466,7 @@ export default function AdminDashboard() {
           { key: 'calendar', label: '📅 考勤日历' },
           { key: 'leave', label: '📝 请假管理' },
           { key: 'overtime', label: '⏱️ 加班记录' },
+          { key: 'makeup', label: '🔄 补卡管理' },
           { key: 'stats', label: '📊 统计报表' },
         ] as const).map(t => (
           <button
@@ -758,6 +765,73 @@ export default function AdminDashboard() {
                   </tr>
                 ))}
                 {overtimes.length === 0 && <tr><td colSpan={7} className="empty">暂无加班记录</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Makeup Tab ─── */}
+      {tab === 'makeup' && (
+        <div className="panel glass-panel">
+          <div className="panel-toolbar">
+            <button className="btn-primary" onClick={() => setShowMakeupForm(true)}>+ 申请补卡</button>
+          </div>
+
+          {showMakeupForm && (
+            <div className="modal-overlay" onClick={() => setShowMakeupForm(false)}>
+              <div className="modal" onClick={e => e.stopPropagation()}>
+                <h3>申请补卡</h3>
+                <select value={makeupForm.employee_id} onChange={e => setMakeupForm({ ...makeupForm, employee_id: e.target.value })}>
+                  <option value="">选择员工</option>
+                  {employees.map(e => <option key={e.id} value={e.id}>{e.name} ({e.department})</option>)}
+                </select>
+                <label>补卡日期</label>
+                <input type="date" value={makeupForm.date} onChange={e => setMakeupForm({ ...makeupForm, date: e.target.value })} />
+                <label>上班时间</label>
+                <input type="time" value={makeupForm.check_in} onChange={e => setMakeupForm({ ...makeupForm, check_in: e.target.value })} />
+                <label>下班时间</label>
+                <input type="time" value={makeupForm.check_out} onChange={e => setMakeupForm({ ...makeupForm, check_out: e.target.value })} />
+                <textarea placeholder="补卡原因" rows={2} value={makeupForm.reason} onChange={e => setMakeupForm({ ...makeupForm, reason: e.target.value })} />
+                <div className="modal-actions">
+                  <button className="btn-secondary" onClick={() => setShowMakeupForm(false)}>取消</button>
+                  <button className="btn-primary" onClick={saveMakeup}>提交</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="data-table">
+            <table>
+              <thead>
+                <tr><th>员工</th><th>部门</th><th>日期</th><th>上班时间</th><th>下班时间</th><th>原因</th><th>状态</th><th>操作</th></tr>
+              </thead>
+              <tbody>
+                {makeups.map(m => (
+                  <tr key={m.id}>
+                    <td><strong>{m.employee?.name}</strong></td>
+                    <td><span className="tag">{m.employee?.department}</span></td>
+                    <td>{formatDate(m.date)}</td>
+                    <td>{m.check_in || '-'}</td>
+                    <td>{m.check_out || '-'}</td>
+                    <td className="cell-truncate" title={m.reason}>{m.reason || '-'}</td>
+                    <td>
+                      <span className={`status-badge ${m.status}`}>
+                        {m.status === 'pending' ? '⏳ 待审批' : m.status === 'approved' ? '✅ 已批准' : '❌ 已拒绝'}
+                      </span>
+                    </td>
+                    <td>
+                      {m.status === 'pending' && (
+                        <>
+                          <button className="btn-icon" onClick={() => updateMakeupStatus(m.id, 'approved')} title="批准">✅</button>
+                          <button className="btn-icon" onClick={() => updateMakeupStatus(m.id, 'rejected')} title="拒绝">❌</button>
+                        </>
+                      )}
+                      <button className="btn-icon" onClick={() => deleteMakeup(m.id)} title="删除">🗑️</button>
+                    </td>
+                  </tr>
+                ))}
+                {makeups.length === 0 && <tr><td colSpan={8} className="empty">暂无补卡记录</td></tr>}
               </tbody>
             </table>
           </div>

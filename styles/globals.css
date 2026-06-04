@@ -89,6 +89,37 @@ body {
 }
 .btn-refresh:hover { background: rgba(0,0,0,0.04); }
 
+/* ─── User Info & Logout ─── */
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-right: 10px;
+}
+.btn-logout {
+  background: none;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: var(--transition);
+}
+.btn-logout:hover {
+  color: #ff4d4f;
+  border-color: #ffccc7;
+  background: #fff2f0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 /* ─── Error Banner ─── */
 .error-banner {
   display: flex;
