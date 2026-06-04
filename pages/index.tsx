@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabase'
 
 /* ─── Types ─── */
@@ -46,6 +47,18 @@ interface OvertimeRecord {
   employee?: Employee
 }
 
+interface MakeupRequest {
+  id: number
+  employee_id: number
+  date: string
+  check_in: string | null
+  check_out: string | null
+  status: 'pending' | 'approved' | 'rejected'
+  reason: string
+  created_at: string
+  employee?: Employee
+}
+
 /* ─── Constants ─── */
 const DEPARTMENTS = ['技术部', '产品部', '设计部', '运营部', '市场部', '人事部', '财务部']
 const LEAVE_TYPES: Record<string, string> = {
@@ -76,15 +89,42 @@ function daysBetween(a: string, b: string) {
   return Math.floor(ms / (1000 * 60 * 60 * 24)) + 1
 }
 
+/* ─── Auth Guard ─── */
+function useAuth() {
+  const router = useRouter()
+  const [user, setUser] = useState<any>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+
+  useEffect(() => {
+    const stored = localStorage.getItem('attendance_user')
+    if (!stored) {
+      router.push('/login')
+      return
+    }
+    const parsed = JSON.parse(stored)
+    if (parsed.role !== 'admin') {
+      router.push('/employee')
+      return
+    }
+    setUser(parsed)
+    setAuthLoading(false)
+  }, [router])
+
+  return { user, authLoading }
+}
+
 /* ─── Main Component ─── */
-export default function Home() {
+export default function AdminDashboard() {
+  const { user, authLoading } = useAuth()
+  const router = useRouter()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
   const [leaves, setLeaves] = useState<LeaveRequest[]>([])
   const [overtimes, setOvertimes] = useState<OvertimeRecord[]>([])
+  const [makeups, setMakeups] = useState<MakeupRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<'employees' | 'attendance' | 'calendar' | 'leave' | 'overtime' | 'stats'>('employees')
+  const [tab, setTab] = useState<'employees' | 'attendance' | 'calendar' | 'leave' | 'overtime' | 'makeup' | 'stats'>('employees')
   const [search, setSearch] = useState('')
   const [deptFilter, setDeptFilter] = useState('全部')
 
@@ -110,6 +150,11 @@ export default function Home() {
     employee_id: '', date: '', hours: '', notes: ''
   })
 
+  const [showMakeupForm, setShowMakeupForm] = useState(false)
+  const [makeupForm, setMakeupForm] = useState({
+    employee_id: '', date: '', check_in: '', check_out: '', reason: ''
+  })
+
   /* Calendar state */
   const [calYear, setCalYear] = useState(new Date().getFullYear())
   const [calMonth, setCalMonth] = useState(new Date().getMonth())
@@ -118,20 +163,23 @@ export default function Home() {
   const loadAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [eRes, aRes, lRes, oRes] = await Promise.all([
+      const [eRes, aRes, lRes, oRes, mRes] = await Promise.all([
         supabase.from('employees').select('*').order('created_at', { ascending: false }),
         supabase.from('attendance_records').select('*, employee:employees(*)').order('date', { ascending: false }),
         supabase.from('leave_requests').select('*, employee:employees(*)').order('created_at', { ascending: false }),
-        supabase.from('overtime_records').select('*, employee:employees(*)').order('created_at', { ascending: false })
+        supabase.from('overtime_records').select('*, employee:employees(*)').order('created_at', { ascending: false }),
+        supabase.from('makeup_requests').select('*, employee:employees(*)').order('created_at', { ascending: false })
       ])
       if (eRes.error) throw eRes.error
       if (aRes.error) throw aRes.error
       if (lRes.error) throw lRes.error
       if (oRes.error) throw oRes.error
+      if (mRes.error) throw mRes.error
       setEmployees(eRes.data || [])
       setAttendance(aRes.data || [])
       setLeaves(lRes.data || [])
       setOvertimes(oRes.data || [])
+      setMakeups(mRes.data || [])
       setError(null)
     } catch (err: any) {
       setError(err.message || '加载失败')
