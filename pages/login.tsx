@@ -26,16 +26,31 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
+    console.log('=== 登录诊断 ===')
+    console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
+    console.log('Supabase Key 长度:', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.length)
+
     try {
-      const { data, error } = await supabase
+      console.log('查询 employee_no:', employeeNo, 'password:', password)
+      
+      const { data, error: queryError } = await supabase
         .from('employees')
         .select('*')
         .eq('employee_no', employeeNo)
         .eq('password', password)
         .single()
 
-      if (error || !data) {
-        setError('员工号或密码错误')
+      console.log('查询结果:', { data, error: queryError })
+
+      if (queryError) {
+        console.error('查询错误详情:', JSON.stringify(queryError))
+        setError('员工号或密码错误 (错误码: ' + (queryError.code || 'unknown') + ')')
+        setLoading(false)
+        return
+      }
+
+      if (!data) {
+        setError('员工号或密码错误 (无匹配数据)')
         setLoading(false)
         return
       }
@@ -48,7 +63,8 @@ export default function LoginPage() {
         router.push('/employee')
       }
     } catch (err: any) {
-      setError(err.message || '登录失败')
+      console.error('登录异常:', err)
+      setError('登录失败: ' + (err.message || '未知错误'))
     } finally {
       setLoading(false)
     }
