@@ -84,7 +84,6 @@ export default function EmployeePage() {
   const [otForm, setOtForm] = useState({ date: '', hours: '', reason: '' })
   
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
   const [showMakeupForm, setShowMakeupForm] = useState(false)
   const [makeupForm, setMakeupForm] = useState({ date: '', check_in: '', check_out: '', reason: '' })
 
@@ -205,7 +204,6 @@ export default function EmployeePage() {
     })
     if (error) { setError(error.message); return }
     if (error) { setError(error.message); return }
-    setShowOtForm(false)
     setOtForm({ date: '', hours: '', reason: '' })
     loadData()
   }
