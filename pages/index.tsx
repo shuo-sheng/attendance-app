@@ -167,7 +167,7 @@ export default function AdminDashboard() {
       const [eRes, aRes, lRes, oRes, mRes] = await Promise.all([
         supabase.from('employees').select('*').order('created_at', { ascending: false }),
         supabase.from('attendance_records').select('*, employee:employees(*)').order('date', { ascending: false }),
-        supabase.from('leave_requests').select('*, employee:employees(*)').order('created_at', { ascending: false }),
+        supabase.from('leave_requests').select('*, employee:employees!leave_requests_employee_id_fkey(*)').order('created_at', { ascending: false }),
         supabase.from('overtime_records').select('*, employee:employees(*)').order('created_at', { ascending: false }),
         supabase.from('makeup_requests').select('*, employee:employees(*)').order('created_at', { ascending: false })
       ])
