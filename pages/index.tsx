@@ -42,7 +42,8 @@ interface OvertimeRecord {
   date: string
   hours: number
   status: 'pending' | 'approved' | 'rejected'
-  notes: string
+  notes?: string
+  reason?: string
   created_at: string
   employee?: Employee
 }
