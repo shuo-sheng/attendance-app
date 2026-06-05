@@ -332,7 +332,7 @@ export default function AdminDashboard() {
       employee_id: Number(otForm.employee_id),
       date: otForm.date,
       hours: Number(otForm.hours),
-      notes: otForm.notes
+      notes: otForm.notes, reason: otForm.notes
     })
     if (error) { setError(error.message); return }
     setShowOtForm(false)
@@ -608,8 +608,8 @@ export default function AdminDashboard() {
                           {STATUS_LABELS[rec.status]}
                         </span>
                         <div className="checkin-times">
-                          {rec.check_in && <span>🌅 签到 {new Date(rec.check_in).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>}
-                          {rec.check_out && <span>🌙 签退 {new Date(rec.check_out).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>}
+                          {rec.check_in && <span>🌅 签到 {new Date(`${rec.date}T${rec.check_in}`).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>}
+                          {rec.check_out && <span>🌙 签退 {new Date(`${rec.date}T${rec.check_out}`).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>}
                         </div>
                       </>
                     ) : (
@@ -785,7 +785,7 @@ export default function AdminDashboard() {
                     <td><span className="tag">{o.employee?.department}</span></td>
                     <td>{formatDate(o.date)}</td>
                     <td><strong>{o.hours} 小时</strong></td>
-                    <td className="cell-truncate" title={o.notes}>{o.notes || '-'}</td>
+                    <td className="cell-truncate" title={o.notes || o.reason}>{o.notes || o.reason || '-'}</td>
                     <td>
                       <span className={`status-badge ${o.status}`}>
                         {o.status === 'pending' ? '⏳ 待审批' : o.status === 'approved' ? '✅ 已批准' : '❌ 已拒绝'}
