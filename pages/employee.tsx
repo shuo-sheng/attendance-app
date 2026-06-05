@@ -226,6 +226,12 @@ export default function EmployeePage() {
     router.push('/login')
   }
 
+  function fmtTime(t: string | null | undefined) {
+    if (!t) return '-'
+    if (/^\d{2}:\d{2}(:\d{2})?$/.test(t)) return t
+    return new Date(t).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  }
+
   if (!user) return <div className="p-8">加载中...</div>
 
   const today = new Date().toISOString().split('T')[0]
