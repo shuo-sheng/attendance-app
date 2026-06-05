@@ -383,16 +383,12 @@ export default function AdminDashboard() {
     if (error) setError(error.message)
     else loadAll()
   }
-
   function logout() {
     localStorage.removeItem('attendance_user')
     router.push('/login')
   }
 
-  if (authLoading) return <div className="p-8">验证中...</div>
-  if (!user) return null
-
-//  ─── Filters ───
+  // ─── Filters & Stats & Calendar (all hooks MUST be before conditional returns) ───
   const filteredEmployees = useMemo(() => {
     return employees.filter(e => {
       const matchSearch = !search || e.name.includes(search) || e.position.includes(search) || e.email?.includes(search)
@@ -401,7 +397,6 @@ export default function AdminDashboard() {
     })
   }, [employees, search, deptFilter])
 
-//  ─── Stats ───
   const stats = useMemo(() => {
     const totalEmp = employees.length
     const todayAttendance = attendance.filter(a => a.date === selectedDate)
@@ -414,7 +409,6 @@ export default function AdminDashboard() {
     const totalRecords = attendance.length || 1
     const attendanceRate = Math.round(((totalRecords - absentCount - leaveCount) / totalRecords) * 100)
 
-    // Dept stats
     const deptStats: Record<string, { total: number; present: number; absent: number }> = {}
     employees.forEach(e => {
       deptStats[e.department] = deptStats[e.department] || { total: 0, present: 0, absent: 0 }
@@ -428,7 +422,6 @@ export default function AdminDashboard() {
       else d.present++
     })
 
-    // Recent 7 days trend
     const trend = []
     for (let i = 6; i >= 0; i--) {
       const d = new Date()
@@ -450,7 +443,6 @@ export default function AdminDashboard() {
     }
   }, [employees, attendance, selectedDate])
 
-//  ─── Calendar ───
   const calDays = useMemo(() => {
     const first = new Date(calYear, calMonth, 1)
     const last = new Date(calYear, calMonth + 1, 0)
@@ -473,7 +465,10 @@ export default function AdminDashboard() {
 
   const weekDays = ['日', '一', '二', '三', '四', '五', '六']
 
-//  ─── Render ───
+  if (authLoading) return <div className="p-8">验证中...</div>
+  if (!user) return null
+
+  // ─── Render ───
   return (
     <div className="app">
       <div className="header glass-panel">
