@@ -83,6 +83,8 @@ export default function EmployeePage() {
   const [showOtForm, setShowOtForm] = useState(false)
   const [otForm, setOtForm] = useState({ date: '', hours: '', reason: '' })
   
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
   const [showMakeupForm, setShowMakeupForm] = useState(false)
   const [makeupForm, setMakeupForm] = useState({ date: '', check_in: '', check_out: '', reason: '' })
 
@@ -104,7 +106,7 @@ export default function EmployeePage() {
     if (!user) return
     setLoading(true)
     try {
-      const [aRes, lRes, oRes, mRes] = await Promise.all([
+      const [aRes, lRes, oRes, mRes] = await Promise.allSettled([
         supabase.from('attendance_records').select('*').eq('employee_id', user.id).order('date', { ascending: false }),
         supabase.from('leave_requests').select('*').eq('employee_id', user.id).order('created_at', { ascending: false }),
         supabase.from('overtime_records').select('*').eq('employee_id', user.id).order('created_at', { ascending: false }),
@@ -186,6 +188,7 @@ export default function EmployeePage() {
       days,
       status: 'pending'
     })
+    if (error) { setError(error.message); return }
     setShowLeaveForm(false)
     setLeaveForm({ start_date: '', end_date: '', type: 'annual', reason: '' })
     loadData()
@@ -193,13 +196,15 @@ export default function EmployeePage() {
 
   async function submitOvertime() {
     if (!user || !otForm.date || !otForm.hours) return
-    await supabase.from('overtime_records').insert({
+    const { error } = await supabase.from('overtime_records').insert({
       employee_id: user.id,
       date: otForm.date,
       hours: Number(otForm.hours),
       reason: otForm.reason,
       status: 'pending'
     })
+    if (error) { setError(error.message); return }
+    if (error) { setError(error.message); return }
     setShowOtForm(false)
     setOtForm({ date: '', hours: '', reason: '' })
     loadData()
@@ -212,6 +217,7 @@ export default function EmployeePage() {
       ...makeupForm,
       status: 'pending'
     })
+    if (error) { setError(error.message); return }
     setShowMakeupForm(false)
     setMakeupForm({ date: '', check_in: '', check_out: '', reason: '' })
     loadData()
@@ -227,6 +233,14 @@ export default function EmployeePage() {
   const today = new Date().toISOString().split('T')[0]
   const todayRecord = attendance.find(a => a.date === today)
   const isCheckedIn = !!todayRecord?.check_in
+  // Auto-dismiss error
+  useEffect(() => {
+    if (error) {
+      const t = setTimeout(() => setError(''), 5000)
+      return () => clearTimeout(t)
+    }
+  }, [error])
+
   const isCheckedOut = !!todayRecord?.check_out
 
   return (
@@ -302,9 +316,9 @@ export default function EmployeePage() {
               {todayRecord && (
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                   <p className="text-sm">
-                    上班: {todayRecord.check_in ? new Date(todayRecord.check_in).toLocaleTimeString('zh-CN') : '未打卡'}
+                    上班: {todayRecord.check_in ? fmtTime(todayRecord.check_in) : '未打卡'}
                     {' · '}
-                    下班: {todayRecord.check_out ? new Date(todayRecord.check_out).toLocaleTimeString('zh-CN') : '未打卡'}
+                    下班: {todayRecord.check_out ? fmtTime(todayRecord.check_out) : '未打卡'}
                     {' · '}
                     状态: <span className={STATUS_COLORS[todayRecord.status] || 'bg-gray-100'}>{STATUS_LABELS[todayRecord.status] || todayRecord.status}</span>
                   </p>
@@ -365,8 +379,8 @@ export default function EmployeePage() {
                   {attendance.map(record => (
                     <tr key={record.id} className="border-b">
                       <td className="py-2">{record.date}</td>
-                      <td className="py-2">{record.check_in ? new Date(record.check_in).toLocaleTimeString('zh-CN') : '-'}</td>
-                      <td className="py-2">{record.check_out ? new Date(record.check_out).toLocaleTimeString('zh-CN') : '-'}</td>
+                      <td className="py-2">{record.check_in ? fmtTime(record.check_in) : '-'}</td>
+                      <td className="py-2">{record.check_out ? fmtTime(record.check_out) : '-'}</td>
                       <td className="py-2">
                         <span className={`px-2 py-1 rounded text-xs ${STATUS_COLORS[record.status] || 'bg-gray-100'}`}>
                           {STATUS_LABELS[record.status] || record.status}
