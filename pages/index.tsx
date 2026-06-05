@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabase'
 
-/* ─── Types ─── */
+// ─── Types ───
 interface Employee {
   id: number
   name: string
@@ -59,7 +59,7 @@ interface MakeupRequest {
   employee?: Employee
 }
 
-/* ─── Constants ─── */
+// ─── Constants ───
 const DEPARTMENTS = ['技术部', '产品部', '设计部', '运营部', '市场部', '人事部', '财务部']
 const LEAVE_TYPES: Record<string, string> = {
   annual: '年假', sick: '病假', personal: '事假', maternity: '产假', other: '其他'
@@ -71,7 +71,7 @@ const STATUS_COLORS: Record<string, string> = {
   normal: '#52c41a', late: '#faad14', early_leave: '#fa8c16', absent: '#ff4d4f', leave: '#1890ff', overtime: '#722ed1'
 }
 
-/* ─── Helpers ─── */
+// ─── Helpers ───
 function todayStr() {
   return new Date().toISOString().split('T')[0]
 }
@@ -89,7 +89,7 @@ function daysBetween(a: string, b: string) {
   return Math.floor(ms / (1000 * 60 * 60 * 24)) + 1
 }
 
-/* ─── Auth Guard ─── */
+// ─── Auth Guard ───
 function useAuth() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
@@ -113,7 +113,7 @@ function useAuth() {
   return { user, authLoading }
 }
 
-/* ─── Main Component ─── */
+// ─── Main Component ───
 export default function AdminDashboard() {
   const { user, authLoading } = useAuth()
   const router = useRouter()
@@ -128,23 +128,23 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState('')
   const [deptFilter, setDeptFilter] = useState('全部')
 
-  /* Employee form */
+//  Employee form
   const [showEmpForm, setShowEmpForm] = useState(false)
   const [editingEmp, setEditingEmp] = useState<Employee | null>(null)
   const [empForm, setEmpForm] = useState({ name: '', department: '技术部', position: '', email: '' })
 
-  /* Attendance check-in */
+//  Attendance check-in
   const [selectedDate, setSelectedDate] = useState(todayStr())
   const [selectedEmpForCheck, setSelectedEmpForCheck] = useState<number | null>(null)
   const [checkNote, setCheckNote] = useState('')
 
-  /* Leave form */
+//  Leave form
   const [showLeaveForm, setShowLeaveForm] = useState(false)
   const [leaveForm, setLeaveForm] = useState({
     employee_id: '', start_date: '', end_date: '', type: 'annual' as const, reason: ''
   })
 
-  /* Overtime form */
+//  Overtime form
   const [showOtForm, setShowOtForm] = useState(false)
   const [otForm, setOtForm] = useState({
     employee_id: '', date: '', hours: '', notes: ''
@@ -155,11 +155,11 @@ export default function AdminDashboard() {
     employee_id: '', date: '', check_in: '', check_out: '', reason: ''
   })
 
-  /* Calendar state */
+//  Calendar state
   const [calYear, setCalYear] = useState(new Date().getFullYear())
   const [calMonth, setCalMonth] = useState(new Date().getMonth())
 
-  /* ─── Data Loading ─── */
+//  ─── Data Loading ───
   const loadAll = useCallback(async () => {
     setLoading(true)
     try {
@@ -190,7 +190,7 @@ export default function AdminDashboard() {
 
   useEffect(() => { loadAll() }, [loadAll])
 
-  /* ─── Employee CRUD ─── */
+//  ─── Employee CRUD ───
   async function saveEmployee() {
     if (!empForm.name.trim() || !empForm.position.trim()) return
     const payload = { ...empForm }
@@ -220,7 +220,7 @@ export default function AdminDashboard() {
     setShowEmpForm(true)
   }
 
-  /* ─── Attendance Check-in/Out ─── */
+//  ─── Attendance Check-in/Out ───
   async function checkIn(empId: number) {
     const { data: existing } = await supabase
       .from('attendance_records')
@@ -296,7 +296,7 @@ export default function AdminDashboard() {
     loadAll()
   }
 
-  /* ─── Leave CRUD ─── */
+//  ─── Leave CRUD ───
   async function saveLeave() {
     if (!leaveForm.employee_id || !leaveForm.start_date || !leaveForm.end_date) return
     const { error } = await supabase.from('leave_requests').insert({
@@ -325,7 +325,7 @@ export default function AdminDashboard() {
     else loadAll()
   }
 
-  /* ─── Overtime CRUD ─── */
+//  ─── Overtime CRUD ───
   async function saveOvertime() {
     if (!otForm.employee_id || !otForm.date || !otForm.hours) return
     const { error } = await supabase.from('overtime_records').insert({
@@ -353,7 +353,7 @@ export default function AdminDashboard() {
     else loadAll()
   }
 
-  /* ─── Makeup CRUD ─── */
+//  ─── Makeup CRUD ───
   async function saveMakeup() {
     if (!makeupForm.employee_id || !makeupForm.date) return
     const { error } = await supabase.from('makeup_requests').insert({
@@ -391,7 +391,7 @@ export default function AdminDashboard() {
   if (authLoading) return <div className="p-8">验证中...</div>
   if (!user) return null
 
-  /* ─── Filters ─── */
+//  ─── Filters ───
   const filteredEmployees = useMemo(() => {
     return employees.filter(e => {
       const matchSearch = !search || e.name.includes(search) || e.position.includes(search) || e.email?.includes(search)
@@ -400,7 +400,7 @@ export default function AdminDashboard() {
     })
   }, [employees, search, deptFilter])
 
-  /* ─── Stats ─── */
+//  ─── Stats ───
   const stats = useMemo(() => {
     const totalEmp = employees.length
     const todayAttendance = attendance.filter(a => a.date === selectedDate)
@@ -449,7 +449,7 @@ export default function AdminDashboard() {
     }
   }, [employees, attendance, selectedDate])
 
-  /* ─── Calendar ─── */
+//  ─── Calendar ───
   const calDays = useMemo(() => {
     const first = new Date(calYear, calMonth, 1)
     const last = new Date(calYear, calMonth + 1, 0)
@@ -472,7 +472,7 @@ export default function AdminDashboard() {
 
   const weekDays = ['日', '一', '二', '三', '四', '五', '六']
 
-  /* ─── Render ─── */
+//  ─── Render ───
   return (
     <div className="app">
       <div className="header glass-panel">
