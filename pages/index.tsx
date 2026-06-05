@@ -191,6 +191,14 @@ export default function AdminDashboard() {
 
   useEffect(() => { loadAll() }, [loadAll])
 
+  // Auto-dismiss error after 5 seconds
+  useEffect(() => {
+    if (error) {
+      const t = setTimeout(() => setError(null), 5000)
+      return () => clearTimeout(t)
+    }
+  }, [error])
+
 //  ─── Employee CRUD ───
   async function saveEmployee() {
     if (!empForm.name.trim() || !empForm.position.trim()) return
@@ -300,10 +308,13 @@ export default function AdminDashboard() {
 //  ─── Leave CRUD ───
   async function saveLeave() {
     if (!leaveForm.employee_id || !leaveForm.start_date || !leaveForm.end_date) return
+    const diff = new Date(leaveForm.end_date).getTime() - new Date(leaveForm.start_date).getTime()
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1
     const { error } = await supabase.from('leave_requests').insert({
       employee_id: Number(leaveForm.employee_id),
       start_date: leaveForm.start_date,
       end_date: leaveForm.end_date,
+      days,
       type: leaveForm.type,
       reason: leaveForm.reason
     })
