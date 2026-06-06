@@ -491,7 +491,7 @@ export default function AdminDashboard() {
               <button className="btn-logout" onClick={logout}>退出</button>
             </span>
           )}
-          <button className="btn-refresh" onClick={loadAll} disabled={loading}>
+          <button className="btn-icon" onClick={loadAll} disabled={loading}>
             {loading ? '⏳' : '🔄'}
           </button>
         </div>
