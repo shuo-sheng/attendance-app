@@ -83,7 +83,6 @@ export default function EmployeePage() {
   const [showOtForm, setShowOtForm] = useState(false)
   const [otForm, setOtForm] = useState({ date: '', hours: '', reason: '' })
   
-  const [error, setError] = useState('')
   const [showMakeupForm, setShowMakeupForm] = useState(false)
   const [makeupForm, setMakeupForm] = useState({ date: '', check_in: '', check_out: '', reason: '' })
 
@@ -105,7 +104,7 @@ export default function EmployeePage() {
     if (!user) return
     setLoading(true)
     try {
-      const [aRes, lRes, oRes, mRes] = await Promise.allSettled([
+      const [aRes, lRes, oRes, mRes] = await Promise.all([
         supabase.from('attendance_records').select('*').eq('employee_id', user.id).order('date', { ascending: false }),
         supabase.from('leave_requests').select('*').eq('employee_id', user.id).order('created_at', { ascending: false }),
         supabase.from('overtime_records').select('*').eq('employee_id', user.id).order('created_at', { ascending: false }),
@@ -187,7 +186,6 @@ export default function EmployeePage() {
       days,
       status: 'pending'
     })
-    if (error) { setError(error.message); return }
     setShowLeaveForm(false)
     setLeaveForm({ start_date: '', end_date: '', type: 'annual', reason: '' })
     loadData()
@@ -195,15 +193,14 @@ export default function EmployeePage() {
 
   async function submitOvertime() {
     if (!user || !otForm.date || !otForm.hours) return
-    const { error } = await supabase.from('overtime_records').insert({
+    await supabase.from('overtime_records').insert({
       employee_id: user.id,
       date: otForm.date,
       hours: Number(otForm.hours),
       reason: otForm.reason,
       status: 'pending'
     })
-    if (error) { setError(error.message); return }
-    if (error) { setError(error.message); return }
+    setShowOtForm(false)
     setOtForm({ date: '', hours: '', reason: '' })
     loadData()
   }
@@ -215,7 +212,6 @@ export default function EmployeePage() {
       ...makeupForm,
       status: 'pending'
     })
-    if (error) { setError(error.message); return }
     setShowMakeupForm(false)
     setMakeupForm({ date: '', check_in: '', check_out: '', reason: '' })
     loadData()
@@ -237,14 +233,6 @@ export default function EmployeePage() {
   const today = new Date().toISOString().split('T')[0]
   const todayRecord = attendance.find(a => a.date === today)
   const isCheckedIn = !!todayRecord?.check_in
-  // Auto-dismiss error
-  useEffect(() => {
-    if (error) {
-      const t = setTimeout(() => setError(''), 5000)
-      return () => clearTimeout(t)
-    }
-  }, [error])
-
   const isCheckedOut = !!todayRecord?.check_out
 
   return (
