@@ -113,8 +113,8 @@ export default function EmployeePage() {
   async function handleCheckIn() {
     if (!user) return
     setCheckInLoading(true)
-    const now = new Date().toISOString()
-    const today = new Date().toISOString().split('T')[0]
+    const now = new Date().toTimeString().split(' ')[0]
+    const today = new Date().toTimeString().split(' ')[0].split('T')[0]
     const hour = new Date().getHours()
     const status = hour >= 9 ? 'late' : 'normal'
     const { data: existing } = await supabase.from('attendance_records').select('*').eq('employee_id', user.id).eq('date', today).single()
@@ -130,8 +130,8 @@ export default function EmployeePage() {
   async function handleCheckOut() {
     if (!user) return
     setCheckOutLoading(true)
-    const now = new Date().toISOString()
-    const today = new Date().toISOString().split('T')[0]
+    const now = new Date().toTimeString().split(' ')[0]
+    const today = new Date().toTimeString().split(' ')[0].split('T')[0]
     const hour = new Date().getHours()
     const { data: existing } = await supabase.from('attendance_records').select('*').eq('employee_id', user.id).eq('date', today).single()
     let status = existing?.status || 'normal'
@@ -180,7 +180,7 @@ export default function EmployeePage() {
 
   if (!user) return <div className="loading"><div className="spinner" /></div>
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = new Date().toTimeString().split(' ')[0].split('T')[0]
   const todayRecord = attendance.find(a => a.date === today)
   const isCheckedIn = !!todayRecord?.check_in
   const isCheckedOut = !!todayRecord?.check_out
