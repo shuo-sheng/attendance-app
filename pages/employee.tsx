@@ -64,6 +64,19 @@ const STATUS_CLASSES: Record<string, string> = {
   overtime: 'status-badge approved'
 }
 
+function downloadCSV(rows: Record<string, any>[], filename: string) {
+  if (rows.length === 0) return
+  const headers = Object.keys(rows[0])
+  const headerRow = headers.join(',')
+  const dataRows = rows.map(r => headers.map(h => {
+    const v = r[h]; return v != null ? `"${String(v).replace(/"/g, '""')}"` : ''
+  }).join(','))
+  const blob = new Blob(['\uFEFF' + headerRow + '\n' + dataRows.join('\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function EmployeePage() {
   const router = useRouter()
   const [user, setUser] = useState<Employee | null>(null)
@@ -300,7 +313,13 @@ export default function EmployeePage() {
       {/* ─── Attendance ─── */}
       {tab === 'attendance' && (
         <div className="glass-panel panel">
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 14, color: 'var(--text-primary)' }}>考勤记录</h3>
+          <div className="panel-toolbar">
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, flex: 1, color: 'var(--text-primary)' }}>考勤记录</h3>
+            <button className="btn-secondary" onClick={() => downloadCSV(
+              attendance.map(a => ({ 日期: a.date, 上班: fmtTime(a.check_in), 下班: fmtTime(a.check_out), 状态: STATUS_LABELS[a.status] || a.status, 备注: a.notes || '' })),
+              `考勤记录_${user.name}_${today}.csv`
+            )}>导出CSV</button>
+          </div>
           <div className="data-table">
             <table>
               <thead>
@@ -327,6 +346,10 @@ export default function EmployeePage() {
         <div className="glass-panel panel">
           <div className="panel-toolbar">
             <h3 style={{ fontSize: '0.95rem', fontWeight: 600, flex: 1, color: 'var(--text-primary)' }}>请假申请</h3>
+            <button className="btn-secondary" onClick={() => downloadCSV(
+              leaves.map(l => ({ 类型: LEAVE_TYPES[l.type] || l.type, 开始: l.start_date, 结束: l.end_date, 天数: l.days, 状态: l.status === 'approved' ? '已通过' : l.status === 'rejected' ? '已拒绝' : '审批中', 原因: l.reason || '' })),
+              `请假记录_${user.name}_${today}.csv`
+            )}>导出CSV</button>
             <button onClick={() => setShowLeaveForm(true)} className="btn-primary">申请请假</button>
           </div>
 
@@ -380,6 +403,10 @@ export default function EmployeePage() {
         <div className="glass-panel panel">
           <div className="panel-toolbar">
             <h3 style={{ fontSize: '0.95rem', fontWeight: 600, flex: 1, color: 'var(--text-primary)' }}>加班申请</h3>
+            <button className="btn-secondary" onClick={() => downloadCSV(
+              overtimes.map(o => ({ 日期: o.date, 时长: o.hours + 'h', 状态: o.status === 'approved' ? '已通过' : o.status === 'rejected' ? '已拒绝' : '审批中', 原因: o.reason || '' })),
+              `加班记录_${user.name}_${today}.csv`
+            )}>导出CSV</button>
             <button onClick={() => setShowOtForm(true)} className="btn-primary">申请加班</button>
           </div>
 
@@ -426,6 +453,10 @@ export default function EmployeePage() {
         <div className="glass-panel panel">
           <div className="panel-toolbar">
             <h3 style={{ fontSize: '0.95rem', fontWeight: 600, flex: 1, color: 'var(--text-primary)' }}>补卡申请</h3>
+            <button className="btn-secondary" onClick={() => downloadCSV(
+              makeups.map(m => ({ 日期: m.date, 上班: m.check_in || '未填', 下班: m.check_out || '未填', 状态: m.status === 'approved' ? '已通过' : m.status === 'rejected' ? '已拒绝' : '审批中', 原因: m.reason || '' })),
+              `补卡记录_${user.name}_${today}.csv`
+            )}>导出CSV</button>
             <button onClick={() => setShowMakeupForm(true)} className="btn-primary">申请补卡</button>
           </div>
 
