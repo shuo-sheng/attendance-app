@@ -62,59 +62,30 @@ interface MakeupRequest {
 
 // ─── Constants ───
 const DEPARTMENTS = ['技术部', '产品部', '设计部', '运营部', '市场部', '人事部', '财务部']
-const LEAVE_TYPES: Record<string, string> = {
-  annual: '年假', sick: '病假', personal: '事假', maternity: '产假', other: '其他'
-}
-const STATUS_LABELS: Record<string, string> = {
-  normal: '正常', late: '迟到', early_leave: '早退', absent: '缺勤', leave: '请假', overtime: '加班'
-}
-const STATUS_COLORS: Record<string, string> = {
-  normal: '#52c41a', late: '#faad14', early_leave: '#fa8c16', absent: '#ff4d4f', leave: '#1890ff', overtime: '#722ed1'
-}
+const LEAVE_TYPES: Record<string, string> = { annual: '年假', sick: '病假', personal: '事假', maternity: '产假', other: '其他' }
+const STATUS_LABELS: Record<string, string> = { normal: '正常', late: '迟到', early_leave: '早退', absent: '缺勤', leave: '请假', overtime: '加班' }
+const STATUS_COLORS: Record<string, string> = { normal: '#5b8c5a', late: '#d4a853', early_leave: '#e8945a', absent: '#d35a4a', leave: '#5b8c85', overtime: '#5b7b8c' }
 
-// ─── Helpers ───
-function todayStr() {
-  return new Date().toISOString().split('T')[0]
-}
-function nowTimeStr() {
-  const d = new Date()
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-function formatDate(d: string) {
-  if (!d) return ''
-  const [y, m, day] = d.split('-')
-  return `${m}/${day}`
-}
-function daysBetween(a: string, b: string) {
-  const ms = new Date(b).getTime() - new Date(a).getTime()
-  return Math.floor(ms / (1000 * 60 * 60 * 24)) + 1
-}
+function todayStr() { return new Date().toISOString().split('T')[0] }
+function formatDate(d: string) { if (!d) return ''; return d.slice(5) }
+function daysBetween(a: string, b: string) { return Math.floor((new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24)) + 1 }
 
 // ─── Auth Guard ───
 function useAuth() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [authLoading, setAuthLoading] = useState(true)
-
   useEffect(() => {
     const stored = localStorage.getItem('attendance_user')
-    if (!stored) {
-      router.push('/login')
-      return
-    }
+    if (!stored) { router.push('/login'); return }
     const parsed = JSON.parse(stored)
-    if (parsed.role !== 'admin') {
-      router.push('/employee')
-      return
-    }
+    if (parsed.role !== 'admin') { router.push('/employee'); return }
     setUser(parsed)
     setAuthLoading(false)
   }, [router])
-
   return { user, authLoading }
 }
 
-// ─── Main Component ───
 export default function AdminDashboard() {
   const { user, authLoading } = useAuth()
   const router = useRouter()
@@ -129,38 +100,32 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState('')
   const [deptFilter, setDeptFilter] = useState('全部')
 
-//  Employee form
+  // Employee form
   const [showEmpForm, setShowEmpForm] = useState(false)
   const [editingEmp, setEditingEmp] = useState<Employee | null>(null)
   const [empForm, setEmpForm] = useState({ name: '', department: '技术部', position: '', email: '' })
 
-//  Attendance check-in
+  // Attendance
   const [selectedDate, setSelectedDate] = useState(todayStr())
-  const [selectedEmpForCheck, setSelectedEmpForCheck] = useState<number | null>(null)
   const [checkNote, setCheckNote] = useState('')
 
-//  Leave form
+  // Leave form
   const [showLeaveForm, setShowLeaveForm] = useState(false)
-  const [leaveForm, setLeaveForm] = useState({
-    employee_id: '', start_date: '', end_date: '', type: 'annual' as const, reason: ''
-  })
+  const [leaveForm, setLeaveForm] = useState({ employee_id: '', start_date: '', end_date: '', type: 'annual' as const, reason: '' })
 
-//  Overtime form
+  // Overtime form
   const [showOtForm, setShowOtForm] = useState(false)
-  const [otForm, setOtForm] = useState({
-    employee_id: '', date: '', hours: '', notes: ''
-  })
+  const [otForm, setOtForm] = useState({ employee_id: '', date: '', hours: '', notes: '' })
 
+  // Makeup form
   const [showMakeupForm, setShowMakeupForm] = useState(false)
-  const [makeupForm, setMakeupForm] = useState({
-    employee_id: '', date: '', check_in: '', check_out: '', reason: ''
-  })
+  const [makeupForm, setMakeupForm] = useState({ employee_id: '', date: '', check_in: '', check_out: '', reason: '' })
 
-//  Calendar state
+  // Calendar
   const [calYear, setCalYear] = useState(new Date().getFullYear())
   const [calMonth, setCalMonth] = useState(new Date().getMonth())
 
-//  ─── Data Loading ───
+  // ─── Data Loading ───
   const loadAll = useCallback(async () => {
     setLoading(true)
     try {
@@ -184,34 +149,25 @@ export default function AdminDashboard() {
       setError(null)
     } catch (err: any) {
       setError(err.message || '加载失败')
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }, [])
 
   useEffect(() => { loadAll() }, [loadAll])
-
-  // Auto-dismiss error after 5 seconds
   useEffect(() => {
-    if (error) {
-      const t = setTimeout(() => setError(null), 5000)
-      return () => clearTimeout(t)
-    }
+    if (error) { const t = setTimeout(() => setError(null), 5000); return () => clearTimeout(t) }
   }, [error])
 
-//  ─── Employee CRUD ───
+  // ─── Employee CRUD ───
   async function saveEmployee() {
     if (!empForm.name.trim() || !empForm.position.trim()) return
-    const payload = { ...empForm }
     if (editingEmp) {
-      const { error } = await supabase.from('employees').update(payload).eq('id', editingEmp.id)
+      const { error } = await supabase.from('employees').update(empForm).eq('id', editingEmp.id)
       if (error) { setError(error.message); return }
     } else {
-      const { error } = await supabase.from('employees').insert(payload)
+      const { error } = await supabase.from('employees').insert(empForm)
       if (error) { setError(error.message); return }
     }
-    setShowEmpForm(false)
-    setEditingEmp(null)
+    setShowEmpForm(false); setEditingEmp(null)
     setEmpForm({ name: '', department: '技术部', position: '', email: '' })
     loadAll()
   }
@@ -219,8 +175,7 @@ export default function AdminDashboard() {
   async function deleteEmployee(id: number) {
     if (!confirm('确定删除该员工？相关考勤/请假/加班记录也会被删除。')) return
     const { error } = await supabase.from('employees').delete().eq('id', id)
-    if (error) setError(error.message)
-    else loadAll()
+    if (error) setError(error.message); else loadAll()
   }
 
   function editEmployee(emp: Employee) {
@@ -229,184 +184,120 @@ export default function AdminDashboard() {
     setShowEmpForm(true)
   }
 
-//  ─── Attendance Check-in/Out ───
+  // ─── Attendance ───
   async function checkIn(empId: number) {
-    const { data: existing } = await supabase
-      .from('attendance_records')
-      .select('*')
-      .eq('employee_id', empId)
-      .eq('date', selectedDate)
-      .single()
-
+    const { data: existing } = await supabase.from('attendance_records').select('*').eq('employee_id', empId).eq('date', selectedDate).single()
     const now = new Date().toISOString()
     const hour = new Date().getHours()
     const status = hour >= 9 ? 'late' : 'normal'
-
     if (existing) {
-      const { error } = await supabase.from('attendance_records').update({
-        check_in: now, status: existing.check_out ? existing.status : status, notes: checkNote || existing.notes
-      }).eq('id', existing.id)
+      const { error } = await supabase.from('attendance_records').update({ check_in: now, status: existing.check_out ? existing.status : status, notes: checkNote || existing.notes }).eq('id', existing.id)
       if (error) setError(error.message)
     } else {
-      const { error } = await supabase.from('attendance_records').insert({
-        employee_id: empId, date: selectedDate, check_in: now, status, notes: checkNote
-      })
+      const { error } = await supabase.from('attendance_records').insert({ employee_id: empId, date: selectedDate, check_in: now, status, notes: checkNote })
       if (error) setError(error.message)
     }
-    setCheckNote('')
-    loadAll()
+    setCheckNote(''); loadAll()
   }
 
   async function checkOut(empId: number) {
-    const { data: existing } = await supabase
-      .from('attendance_records')
-      .select('*')
-      .eq('employee_id', empId)
-      .eq('date', selectedDate)
-      .single()
-
+    const { data: existing } = await supabase.from('attendance_records').select('*').eq('employee_id', empId).eq('date', selectedDate).single()
     const now = new Date().toISOString()
     const hour = new Date().getHours()
     let status = existing?.status || 'normal'
     if (hour < 18 && status !== 'late') status = 'early_leave'
-
     if (existing) {
-      const { error } = await supabase.from('attendance_records').update({
-        check_out: now, status, notes: checkNote || existing.notes
-      }).eq('id', existing.id)
+      const { error } = await supabase.from('attendance_records').update({ check_out: now, status, notes: checkNote || existing.notes }).eq('id', existing.id)
       if (error) setError(error.message)
     } else {
-      const { error } = await supabase.from('attendance_records').insert({
-        employee_id: empId, date: selectedDate, check_out: now, status: 'early_leave', notes: checkNote
-      })
+      const { error } = await supabase.from('attendance_records').insert({ employee_id: empId, date: selectedDate, check_out: now, status: 'early_leave', notes: checkNote })
       if (error) setError(error.message)
     }
-    setCheckNote('')
-    loadAll()
+    setCheckNote(''); loadAll()
   }
 
   async function markAbsent(empId: number) {
-    const { data: existing } = await supabase
-      .from('attendance_records')
-      .select('*')
-      .eq('employee_id', empId)
-      .eq('date', selectedDate)
-      .single()
-
+    const { data: existing } = await supabase.from('attendance_records').select('*').eq('employee_id', empId).eq('date', selectedDate).single()
     if (existing) {
       const { error } = await supabase.from('attendance_records').update({ status: 'absent' }).eq('id', existing.id)
       if (error) setError(error.message)
     } else {
-      const { error } = await supabase.from('attendance_records').insert({
-        employee_id: empId, date: selectedDate, status: 'absent', notes: checkNote
-      })
+      const { error } = await supabase.from('attendance_records').insert({ employee_id: empId, date: selectedDate, status: 'absent', notes: checkNote })
       if (error) setError(error.message)
     }
     loadAll()
   }
 
-//  ─── Leave CRUD ───
+  // ─── Leave CRUD ───
   async function saveLeave() {
     if (!leaveForm.employee_id || !leaveForm.start_date || !leaveForm.end_date) return
     const diff = new Date(leaveForm.end_date).getTime() - new Date(leaveForm.start_date).getTime()
     const days = Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1
-    const { error } = await supabase.from('leave_requests').insert({
-      employee_id: Number(leaveForm.employee_id),
-      start_date: leaveForm.start_date,
-      end_date: leaveForm.end_date,
-      days,
-      type: leaveForm.type,
-      reason: leaveForm.reason
-    })
+    const { error } = await supabase.from('leave_requests').insert({ employee_id: Number(leaveForm.employee_id), start_date: leaveForm.start_date, end_date: leaveForm.end_date, days, type: leaveForm.type, reason: leaveForm.reason })
     if (error) { setError(error.message); return }
-    setShowLeaveForm(false)
-    setLeaveForm({ employee_id: '', start_date: '', end_date: '', type: 'annual', reason: '' })
+    setShowLeaveForm(false); setLeaveForm({ employee_id: '', start_date: '', end_date: '', type: 'annual', reason: '' })
     loadAll()
   }
 
   async function updateLeaveStatus(id: number, status: 'approved' | 'rejected') {
     const { error } = await supabase.from('leave_requests').update({ status }).eq('id', id)
-    if (error) setError(error.message)
-    else loadAll()
+    if (error) setError(error.message); else loadAll()
   }
 
   async function deleteLeave(id: number) {
     if (!confirm('确定删除这条请假记录？')) return
     const { error } = await supabase.from('leave_requests').delete().eq('id', id)
-    if (error) setError(error.message)
-    else loadAll()
+    if (error) setError(error.message); else loadAll()
   }
 
-//  ─── Overtime CRUD ───
+  // ─── Overtime CRUD ───
   async function saveOvertime() {
     if (!otForm.employee_id || !otForm.date || !otForm.hours) return
-    const { error } = await supabase.from('overtime_records').insert({
-      employee_id: Number(otForm.employee_id),
-      date: otForm.date,
-      hours: Number(otForm.hours),
-      notes: otForm.notes, reason: otForm.notes
-    })
+    const { error } = await supabase.from('overtime_records').insert({ employee_id: Number(otForm.employee_id), date: otForm.date, hours: Number(otForm.hours), notes: otForm.notes, reason: otForm.notes })
     if (error) { setError(error.message); return }
-    setShowOtForm(false)
-    setOtForm({ employee_id: '', date: '', hours: '', notes: '' })
+    setShowOtForm(false); setOtForm({ employee_id: '', date: '', hours: '', notes: '' })
     loadAll()
   }
 
   async function updateOtStatus(id: number, status: 'approved' | 'rejected') {
     const { error } = await supabase.from('overtime_records').update({ status }).eq('id', id)
-    if (error) setError(error.message)
-    else loadAll()
+    if (error) setError(error.message); else loadAll()
   }
 
   async function deleteOvertime(id: number) {
     if (!confirm('确定删除这条加班记录？')) return
     const { error } = await supabase.from('overtime_records').delete().eq('id', id)
-    if (error) setError(error.message)
-    else loadAll()
+    if (error) setError(error.message); else loadAll()
   }
 
-//  ─── Makeup CRUD ───
+  // ─── Makeup CRUD ───
   async function saveMakeup() {
     if (!makeupForm.employee_id || !makeupForm.date) return
-    const { error } = await supabase.from('makeup_requests').insert({
-      employee_id: Number(makeupForm.employee_id),
-      date: makeupForm.date,
-      check_in: makeupForm.check_in || null,
-      check_out: makeupForm.check_out || null,
-      reason: makeupForm.reason,
-      status: 'pending'
-    })
+    const { error } = await supabase.from('makeup_requests').insert({ employee_id: Number(makeupForm.employee_id), date: makeupForm.date, check_in: makeupForm.check_in || null, check_out: makeupForm.check_out || null, reason: makeupForm.reason, status: 'pending' })
     if (error) { setError(error.message); return }
-    setShowMakeupForm(false)
-    setMakeupForm({ employee_id: '', date: '', check_in: '', check_out: '', reason: '' })
+    setShowMakeupForm(false); setMakeupForm({ employee_id: '', date: '', check_in: '', check_out: '', reason: '' })
     loadAll()
   }
 
   async function updateMakeupStatus(id: number, status: 'approved' | 'rejected') {
     const { error } = await supabase.from('makeup_requests').update({ status }).eq('id', id)
-    if (error) setError(error.message)
-    else loadAll()
+    if (error) setError(error.message); else loadAll()
   }
 
   async function deleteMakeup(id: number) {
     if (!confirm('确定删除这条补卡记录？')) return
     const { error } = await supabase.from('makeup_requests').delete().eq('id', id)
-    if (error) setError(error.message)
-    else loadAll()
-  }
-  function logout() {
-    localStorage.removeItem('attendance_user')
-    router.push('/login')
+    if (error) setError(error.message); else loadAll()
   }
 
-  // ─── Filters & Stats & Calendar (all hooks MUST be before conditional returns) ───
-  const filteredEmployees = useMemo(() => {
-    return employees.filter(e => {
-      const matchSearch = !search || e.name.includes(search) || e.position.includes(search) || e.email?.includes(search)
-      const matchDept = deptFilter === '全部' || e.department === deptFilter
-      return matchSearch && matchDept
-    })
-  }, [employees, search, deptFilter])
+  function logout() { localStorage.removeItem('attendance_user'); router.push('/login') }
+
+  // ─── Filters & Stats & Calendar ───
+  const filteredEmployees = useMemo(() => employees.filter(e => {
+    const matchSearch = !search || e.name.includes(search) || e.position.includes(search) || e.email?.includes(search)
+    const matchDept = deptFilter === '全部' || e.department === deptFilter
+    return matchSearch && matchDept
+  }), [employees, search, deptFilter])
 
   const stats = useMemo(() => {
     const totalEmp = employees.length
@@ -419,108 +310,66 @@ export default function AdminDashboard() {
     const leaveCount = attendance.filter(a => a.status === 'leave').length
     const totalRecords = attendance.length || 1
     const attendanceRate = Math.round(((totalRecords - absentCount - leaveCount) / totalRecords) * 100)
-
     const deptStats: Record<string, { total: number; present: number; absent: number }> = {}
-    employees.forEach(e => {
-      deptStats[e.department] = deptStats[e.department] || { total: 0, present: 0, absent: 0 }
-    })
+    employees.forEach(e => { deptStats[e.department] = deptStats[e.department] || { total: 0, present: 0, absent: 0 } })
     todayAttendance.forEach(a => {
       const emp = employees.find(e => e.id === a.employee_id)
       if (!emp) return
-      const d = deptStats[emp.department]
-      d.total++
-      if (a.status === 'absent' || a.status === 'leave') d.absent++
-      else d.present++
+      const d = deptStats[emp.department]; d.total++
+      if (a.status === 'absent' || a.status === 'leave') d.absent++; else d.present++
     })
-
     const trend = []
     for (let i = 6; i >= 0; i--) {
-      const d = new Date()
-      d.setDate(d.getDate() - i)
+      const d = new Date(); d.setDate(d.getDate() - i)
       const ds = d.toISOString().split('T')[0]
       const dayRecs = attendance.filter(a => a.date === ds)
-      trend.push({
-        date: `${d.getMonth() + 1}/${d.getDate()}`,
-        present: dayRecs.filter(a => a.status !== 'absent' && a.status !== 'leave').length,
-        absent: dayRecs.filter(a => a.status === 'absent').length,
-        late: dayRecs.filter(a => a.status === 'late').length
-      })
+      trend.push({ date: `${d.getMonth() + 1}/${d.getDate()}`, present: dayRecs.filter(a => a.status !== 'absent' && a.status !== 'leave').length, absent: dayRecs.filter(a => a.status === 'absent').length, late: dayRecs.filter(a => a.status === 'late').length })
     }
-
-    return {
-      totalEmp, checkedIn, checkedOut, attendanceRate,
-      lateCount, earlyCount, absentCount, leaveCount,
-      deptStats, trend
-    }
+    return { totalEmp, checkedIn, checkedOut, attendanceRate, lateCount, earlyCount, absentCount, leaveCount, deptStats, trend }
   }, [employees, attendance, selectedDate])
 
   const calDays = useMemo(() => {
-    const first = new Date(calYear, calMonth, 1)
-    const last = new Date(calYear, calMonth + 1, 0)
-    const startDay = first.getDay()
-    const daysInMonth = last.getDate()
+    const first = new Date(calYear, calMonth, 1); const last = new Date(calYear, calMonth + 1, 0)
     const days: (number | null)[] = []
-    for (let i = 0; i < startDay; i++) days.push(null)
-    for (let i = 1; i <= daysInMonth; i++) days.push(i)
+    for (let i = 0; i < first.getDay(); i++) days.push(null)
+    for (let i = 1; i <= last.getDate(); i++) days.push(i)
     return days
   }, [calYear, calMonth])
 
   const attendanceByDate = useMemo(() => {
     const map = new Map<string, AttendanceRecord[]>()
-    attendance.forEach(a => {
-      if (!map.has(a.date)) map.set(a.date, [])
-      map.get(a.date)!.push(a)
-    })
+    attendance.forEach(a => { if (!map.has(a.date)) map.set(a.date, []); map.get(a.date)!.push(a) })
     return map
   }, [attendance])
 
   const weekDays = ['日', '一', '二', '三', '四', '五', '六']
+  const tabLabels: Record<string, string> = { employees: '员工管理', attendance: '每日考勤', calendar: '考勤日历', leave: '请假管理', overtime: '加班记录', makeup: '补卡管理', stats: '统计报表' }
 
-  if (authLoading) return <div className="p-8">验证中...</div>
+  if (authLoading) return <div className="loading"><div className="spinner" /></div>
   if (!user) return null
 
-  // ─── Render ───
   return (
     <div className="app">
-      <div className="header glass-panel">
-        <h1>📋 考勤管理系统</h1>
+      {/* Header */}
+      <header className="header glass-panel">
+        <h1>考勤管理系统</h1>
         <div className="header-actions">
-          {user && (
-            <span className="user-info">
-              👤 {user.name} ({user.employee_no}) · 
-              <button className="btn-logout" onClick={logout}>退出</button>
-            </span>
-          )}
-          <button className="btn-icon" onClick={loadAll} disabled={loading}>
-            {loading ? '⏳' : '🔄'}
-          </button>
+          {user && <span className="user-info">{user.name} ({user.employee_no})</span>}
+          <button className="btn-logout" onClick={logout}>退出</button>
+          <button className="btn-refresh" onClick={loadAll} disabled={loading} title="刷新">&#x21bb;</button>
         </div>
-      </div>
+      </header>
 
       {error && (
         <div className="error-banner">
           <span>{error}</span>
-          <button onClick={() => setError(null)}>✕</button>
+          <button onClick={() => setError(null)}>&times;</button>
         </div>
       )}
 
       <div className="tabs">
-        {([
-          { key: 'employees', label: '👥 员工管理' },
-          { key: 'attendance', label: '⏰ 每日考勤' },
-          { key: 'calendar', label: '📅 考勤日历' },
-          { key: 'leave', label: '📝 请假管理' },
-          { key: 'overtime', label: '⏱️ 加班记录' },
-          { key: 'makeup', label: '🔄 补卡管理' },
-          { key: 'stats', label: '📊 统计报表' },
-        ] as const).map(t => (
-          <button
-            key={t.key}
-            className={`tab ${tab === t.key ? 'active' : ''}`}
-            onClick={() => setTab(t.key)}
-          >
-            {t.label}
-          </button>
+        {Object.entries(tabLabels).map(([key, label]) => (
+          <button key={key} className={`tab ${tab === key ? 'active' : ''}`} onClick={() => setTab(key as any)}>{label}</button>
         ))}
       </div>
 
@@ -528,19 +377,12 @@ export default function AdminDashboard() {
       {tab === 'employees' && (
         <div className="panel glass-panel">
           <div className="panel-toolbar">
-            <input
-              className="search-input"
-              placeholder="🔍 搜索员工姓名、职位、邮箱..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-            <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} className="select">
+            <input className="search-input" placeholder="搜索员工姓名、职位、邮箱..." value={search} onChange={e => setSearch(e.target.value)} />
+            <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
               <option value="全部">全部部门</option>
               {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
-            <button className="btn-primary" onClick={() => { setEditingEmp(null); setEmpForm({ name: '', department: '技术部', position: '', email: '' }); setShowEmpForm(true) }}>
-              + 添加员工
-            </button>
+            <button className="btn-primary" onClick={() => { setEditingEmp(null); setEmpForm({ name: '', department: '技术部', position: '', email: '' }); setShowEmpForm(true) }}>添加员工</button>
           </div>
 
           {showEmpForm && (
@@ -563,11 +405,7 @@ export default function AdminDashboard() {
 
           <div className="data-table">
             <table>
-              <thead>
-                <tr>
-                  <th>姓名</th><th>部门</th><th>职位</th><th>邮箱</th><th>入职时间</th><th>操作</th>
-                </tr>
-              </thead>
+              <thead><tr><th>姓名</th><th>部门</th><th>职位</th><th>邮箱</th><th>入职时间</th><th>操作</th></tr></thead>
               <tbody>
                 {filteredEmployees.map(emp => (
                   <tr key={emp.id}>
@@ -577,14 +415,12 @@ export default function AdminDashboard() {
                     <td>{emp.email || '-'}</td>
                     <td>{formatDate(emp.created_at?.split('T')[0])}</td>
                     <td>
-                      <button className="btn-icon" onClick={() => editEmployee(emp)} title="编辑">✏️</button>
-                      <button className="btn-icon" onClick={() => deleteEmployee(emp.id)} title="删除">🗑️</button>
+                      <button className="btn-small" onClick={() => editEmployee(emp)}>编辑</button>
+                      <button className="btn-small btn-danger" onClick={() => deleteEmployee(emp.id)}>删除</button>
                     </td>
                   </tr>
                 ))}
-                {filteredEmployees.length === 0 && (
-                  <tr><td colSpan={6} className="empty">暂无员工，请添加</td></tr>
-                )}
+                {filteredEmployees.length === 0 && <tr><td colSpan={6} className="empty">暂无员工，请添加</td></tr>}
               </tbody>
             </table>
           </div>
@@ -598,12 +434,11 @@ export default function AdminDashboard() {
             <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="date-input" />
             <span className="toolbar-info">共 {employees.length} 人</span>
           </div>
-
           <div className="checkin-grid">
             {employees.map(emp => {
               const rec = attendance.find(a => a.employee_id === emp.id && a.date === selectedDate)
               return (
-                <div key={emp.id} className={`checkin-card ${rec?.status || 'normal'}`}>
+                <div key={emp.id} className="checkin-card">
                   <div className="checkin-header">
                     <strong>{emp.name}</strong>
                     <span className="tag">{emp.department}</span>
@@ -611,28 +446,20 @@ export default function AdminDashboard() {
                   <div className="checkin-status">
                     {rec ? (
                       <>
-                        <span className="status-badge" style={{ background: STATUS_COLORS[rec.status] + '20', color: STATUS_COLORS[rec.status] }}>
-                          {STATUS_LABELS[rec.status]}
-                        </span>
+                        <span className="status-badge" style={{ background: STATUS_COLORS[rec.status] + '20', color: STATUS_COLORS[rec.status] }}>{STATUS_LABELS[rec.status]}</span>
                         <div className="checkin-times">
-                          {rec.check_in && <span>🌅 签到 {new Date(`${rec.date}T${rec.check_in}`).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>}
-                          {rec.check_out && <span>🌙 签退 {new Date(`${rec.date}T${rec.check_out}`).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>}
+                          {rec.check_in && <span>签到 {new Date(`${rec.date}T${rec.check_in}`).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>}
+                          {rec.check_out && <span>签退 {new Date(`${rec.date}T${rec.check_out}`).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>}
                         </div>
                       </>
-                    ) : (
-                      <span className="status-badge" style={{ background: '#f0f0f0', color: '#999' }}>未打卡</span>
-                    )}
+                    ) : <span className="status-badge" style={{ background: '#f0f0f0', color: '#999' }}>未打卡</span>}
                   </div>
                   <div className="checkin-actions">
-                    <button className="btn-small" onClick={() => checkIn(emp.id)} disabled={!!rec?.check_in}>
-                      {rec?.check_in ? '已签到' : '签到'}
-                    </button>
-                    <button className="btn-small" onClick={() => checkOut(emp.id)} disabled={!rec?.check_in || !!rec?.check_out}>
-                      {rec?.check_out ? '已签退' : '签退'}
-                    </button>
+                    <button className="btn-small" onClick={() => checkIn(emp.id)} disabled={!!rec?.check_in}>{rec?.check_in ? '已签到' : '签到'}</button>
+                    <button className="btn-small" onClick={() => checkOut(emp.id)} disabled={!rec?.check_in || !!rec?.check_out}>{rec?.check_out ? '已签退' : '签退'}</button>
                     <button className="btn-small btn-danger" onClick={() => markAbsent(emp.id)}>缺勤</button>
                   </div>
-                  {rec?.notes && <p className="checkin-note">📝 {rec.notes}</p>}
+                  {rec?.notes && <p className="checkin-note">{rec.notes}</p>}
                 </div>
               )
             })}
@@ -644,9 +471,9 @@ export default function AdminDashboard() {
       {tab === 'calendar' && (
         <div className="panel glass-panel">
           <div className="calendar-header">
-            <button className="cal-nav" onClick={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1) } else setCalMonth(m => m - 1) }}>◀</button>
+            <button className="cal-nav" onClick={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1) } else setCalMonth(m => m - 1) }}>&#x25c0;</button>
             <span className="cal-title">{calYear}年 {calMonth + 1}月</span>
-            <button className="cal-nav" onClick={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1) } else setCalMonth(m => m + 1) }}>▶</button>
+            <button className="cal-nav" onClick={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1) } else setCalMonth(m => m + 1) }}>&#x25b6;</button>
           </div>
           <div className="calendar-grid">
             {weekDays.map(d => <div key={d} className="cal-weekday">{d}</div>)}
@@ -657,11 +484,7 @@ export default function AdminDashboard() {
               const isToday = ds === todayStr()
               const isSelected = ds === selectedDate
               return (
-                <div
-                  key={ds}
-                  className={`cal-day ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`}
-                  onClick={() => { setSelectedDate(ds); setTab('attendance') }}
-                >
+                <div key={ds} className={`cal-day ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`} onClick={() => { setSelectedDate(ds); setTab('attendance') }}>
                   <span className="day-number">{day}</span>
                   {dayRecs.length > 0 && (
                     <div className="day-badges">
@@ -688,7 +511,7 @@ export default function AdminDashboard() {
       {tab === 'leave' && (
         <div className="panel glass-panel">
           <div className="panel-toolbar">
-            <button className="btn-primary" onClick={() => setShowLeaveForm(true)}>+ 申请请假</button>
+            <button className="btn-primary" onClick={() => setShowLeaveForm(true)}>申请请假</button>
           </div>
 
           {showLeaveForm && (
@@ -717,9 +540,7 @@ export default function AdminDashboard() {
 
           <div className="data-table">
             <table>
-              <thead>
-                <tr><th>员工</th><th>部门</th><th>类型</th><th>起止日期</th><th>天数</th><th>原因</th><th>状态</th><th>操作</th></tr>
-              </thead>
+              <thead><tr><th>员工</th><th>部门</th><th>类型</th><th>起止日期</th><th>天数</th><th>原因</th><th>状态</th><th>操作</th></tr></thead>
               <tbody>
                 {leaves.map(l => (
                   <tr key={l.id}>
@@ -729,19 +550,15 @@ export default function AdminDashboard() {
                     <td>{formatDate(l.start_date)} - {formatDate(l.end_date)}</td>
                     <td>{daysBetween(l.start_date, l.end_date)} 天</td>
                     <td className="cell-truncate" title={l.reason}>{l.reason || '-'}</td>
-                    <td>
-                      <span className={`status-badge ${l.status}`}>
-                        {l.status === 'pending' ? '⏳ 待审批' : l.status === 'approved' ? '✅ 已批准' : '❌ 已拒绝'}
-                      </span>
-                    </td>
+                    <td><span className={`status-badge ${l.status}`}>{l.status === 'pending' ? '待审批' : l.status === 'approved' ? '已批准' : '已拒绝'}</span></td>
                     <td>
                       {l.status === 'pending' && (
                         <>
-                          <button className="btn-icon" onClick={() => updateLeaveStatus(l.id, 'approved')} title="批准">✅</button>
-                          <button className="btn-icon" onClick={() => updateLeaveStatus(l.id, 'rejected')} title="拒绝">❌</button>
+                          <button className="btn-small" onClick={() => updateLeaveStatus(l.id, 'approved')}>批准</button>
+                          <button className="btn-small btn-danger" onClick={() => updateLeaveStatus(l.id, 'rejected')}>拒绝</button>
                         </>
                       )}
-                      <button className="btn-icon" onClick={() => deleteLeave(l.id)} title="删除">🗑️</button>
+                      <button className="btn-small btn-danger" onClick={() => deleteLeave(l.id)}>删除</button>
                     </td>
                   </tr>
                 ))}
@@ -756,7 +573,7 @@ export default function AdminDashboard() {
       {tab === 'overtime' && (
         <div className="panel glass-panel">
           <div className="panel-toolbar">
-            <button className="btn-primary" onClick={() => setShowOtForm(true)}>+ 申请加班</button>
+            <button className="btn-primary" onClick={() => setShowOtForm(true)}>申请加班</button>
           </div>
 
           {showOtForm && (
@@ -782,9 +599,7 @@ export default function AdminDashboard() {
 
           <div className="data-table">
             <table>
-              <thead>
-                <tr><th>员工</th><th>部门</th><th>日期</th><th>时长</th><th>备注</th><th>状态</th><th>操作</th></tr>
-              </thead>
+              <thead><tr><th>员工</th><th>部门</th><th>日期</th><th>时长</th><th>备注</th><th>状态</th><th>操作</th></tr></thead>
               <tbody>
                 {overtimes.map(o => (
                   <tr key={o.id}>
@@ -793,19 +608,15 @@ export default function AdminDashboard() {
                     <td>{formatDate(o.date)}</td>
                     <td><strong>{o.hours} 小时</strong></td>
                     <td className="cell-truncate" title={o.notes || o.reason}>{o.notes || o.reason || '-'}</td>
-                    <td>
-                      <span className={`status-badge ${o.status}`}>
-                        {o.status === 'pending' ? '⏳ 待审批' : o.status === 'approved' ? '✅ 已批准' : '❌ 已拒绝'}
-                      </span>
-                    </td>
+                    <td><span className={`status-badge ${o.status}`}>{o.status === 'pending' ? '待审批' : o.status === 'approved' ? '已批准' : '已拒绝'}</span></td>
                     <td>
                       {o.status === 'pending' && (
                         <>
-                          <button className="btn-icon" onClick={() => updateOtStatus(o.id, 'approved')} title="批准">✅</button>
-                          <button className="btn-icon" onClick={() => updateOtStatus(o.id, 'rejected')} title="拒绝">❌</button>
+                          <button className="btn-small" onClick={() => updateOtStatus(o.id, 'approved')}>批准</button>
+                          <button className="btn-small btn-danger" onClick={() => updateOtStatus(o.id, 'rejected')}>拒绝</button>
                         </>
                       )}
-                      <button className="btn-icon" onClick={() => deleteOvertime(o.id)} title="删除">🗑️</button>
+                      <button className="btn-small btn-danger" onClick={() => deleteOvertime(o.id)}>删除</button>
                     </td>
                   </tr>
                 ))}
@@ -820,7 +631,7 @@ export default function AdminDashboard() {
       {tab === 'makeup' && (
         <div className="panel glass-panel">
           <div className="panel-toolbar">
-            <button className="btn-primary" onClick={() => setShowMakeupForm(true)}>+ 申请补卡</button>
+            <button className="btn-primary" onClick={() => setShowMakeupForm(true)}>申请补卡</button>
           </div>
 
           {showMakeupForm && (
@@ -837,7 +648,7 @@ export default function AdminDashboard() {
                 <input type="time" value={makeupForm.check_in} onChange={e => setMakeupForm({ ...makeupForm, check_in: e.target.value })} />
                 <label>下班时间</label>
                 <input type="time" value={makeupForm.check_out} onChange={e => setMakeupForm({ ...makeupForm, check_out: e.target.value })} />
-                <textarea placeholder="补卡原因" rows={2} value={makeupForm.reason} onChange={e => setMakeupForm({ ...makeupForm, reason: e.target.value })} />
+                <textarea placeholder="补卡原因" rows={3} value={makeupForm.reason} onChange={e => setMakeupForm({ ...makeupForm, reason: e.target.value })} />
                 <div className="modal-actions">
                   <button className="btn-secondary" onClick={() => setShowMakeupForm(false)}>取消</button>
                   <button className="btn-primary" onClick={saveMakeup}>提交</button>
@@ -848,9 +659,7 @@ export default function AdminDashboard() {
 
           <div className="data-table">
             <table>
-              <thead>
-                <tr><th>员工</th><th>部门</th><th>日期</th><th>上班时间</th><th>下班时间</th><th>原因</th><th>状态</th><th>操作</th></tr>
-              </thead>
+              <thead><tr><th>员工</th><th>部门</th><th>日期</th><th>上班</th><th>下班</th><th>原因</th><th>状态</th><th>操作</th></tr></thead>
               <tbody>
                 {makeups.map(m => (
                   <tr key={m.id}>
@@ -860,19 +669,15 @@ export default function AdminDashboard() {
                     <td>{m.check_in || '-'}</td>
                     <td>{m.check_out || '-'}</td>
                     <td className="cell-truncate" title={m.reason}>{m.reason || '-'}</td>
-                    <td>
-                      <span className={`status-badge ${m.status}`}>
-                        {m.status === 'pending' ? '⏳ 待审批' : m.status === 'approved' ? '✅ 已批准' : '❌ 已拒绝'}
-                      </span>
-                    </td>
+                    <td><span className={`status-badge ${m.status}`}>{m.status === 'pending' ? '待审批' : m.status === 'approved' ? '已批准' : '已拒绝'}</span></td>
                     <td>
                       {m.status === 'pending' && (
                         <>
-                          <button className="btn-icon" onClick={() => updateMakeupStatus(m.id, 'approved')} title="批准">✅</button>
-                          <button className="btn-icon" onClick={() => updateMakeupStatus(m.id, 'rejected')} title="拒绝">❌</button>
+                          <button className="btn-small" onClick={() => updateMakeupStatus(m.id, 'approved')}>批准</button>
+                          <button className="btn-small btn-danger" onClick={() => updateMakeupStatus(m.id, 'rejected')}>拒绝</button>
                         </>
                       )}
-                      <button className="btn-icon" onClick={() => deleteMakeup(m.id)} title="删除">🗑️</button>
+                      <button className="btn-small btn-danger" onClick={() => deleteMakeup(m.id)}>删除</button>
                     </td>
                   </tr>
                 ))}
@@ -886,80 +691,48 @@ export default function AdminDashboard() {
       {/* ─── Stats Tab ─── */}
       {tab === 'stats' && (
         <div className="panel glass-panel">
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 16, color: 'var(--text-primary)' }}>考勤概览</h3>
           <div className="stats-cards">
-            <div className="stat-card">
-              <div className="stat-number">{stats.totalEmp}</div>
-              <div className="stat-label">总员工</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-number" style={{ color: '#52c41a' }}>{stats.attendanceRate}%</div>
-              <div className="stat-label">出勤率</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-number" style={{ color: '#faad14' }}>{stats.lateCount}</div>
-              <div className="stat-label">迟到</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-number" style={{ color: '#fa8c16' }}>{stats.earlyCount}</div>
-              <div className="stat-label">早退</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-number" style={{ color: '#ff4d4f' }}>{stats.absentCount}</div>
-              <div className="stat-label">缺勤</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-number" style={{ color: '#1890ff' }}>{stats.leaveCount}</div>
-              <div className="stat-label">请假</div>
-            </div>
+            {[
+              { label: '总人数', value: stats.totalEmp },
+              { label: '今日签到', value: stats.checkedIn },
+              { label: '今日签退', value: stats.checkedOut },
+              { label: '出勤率', value: stats.attendanceRate + '%' },
+            ].map(s => <div key={s.label} className="stat-card"><div className="stat-number">{s.value}</div><div className="stat-label">{s.label}</div></div>)}
+          </div>
+          <div className="stats-cards">
+            {[
+              { label: '迟到', value: stats.lateCount },
+              { label: '早退', value: stats.earlyCount },
+              { label: '缺勤', value: stats.absentCount },
+              { label: '请假', value: stats.leaveCount },
+            ].map(s => <div key={s.label} className="stat-card"><div className="stat-number">{s.value}</div><div className="stat-label">{s.label}</div></div>)}
           </div>
 
           <div className="stats-section">
-            <h3>📅 今日考勤 ({formatDate(selectedDate)})</h3>
-            <div className="stats-row">
-              <span>签到: {stats.checkedIn}/{stats.totalEmp}</span>
-              <span>签退: {stats.checkedOut}/{stats.totalEmp}</span>
-            </div>
-            <div className="progress-bar">
-              <div className="progress-fill" style={{ width: `${stats.totalEmp ? (stats.checkedIn / stats.totalEmp) * 100 : 0}%`, background: '#52c41a' }} />
-            </div>
-          </div>
-
-          <div className="stats-section">
-            <h3>🏢 部门出勤</h3>
+            <h3>部门出勤 - {selectedDate}</h3>
             {Object.entries(stats.deptStats).map(([dept, d]) => (
               <div key={dept} className="stats-row">
-                <span>{dept}</span>
-                <span>出勤 {d.present} / 缺勤 {d.absent}</span>
+                <span style={{ minWidth: 60, fontWeight: 600 }}>{dept}</span>
                 <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: `${d.total ? (d.present / d.total) * 100 : 0}%`, background: '#1890ff' }} />
+                  <div className="progress-fill" style={{ width: d.total > 0 ? `${(d.present / d.total) * 100}%` : '0%', background: 'var(--success)' }} />
                 </div>
+                <span style={{ fontSize: 12 }}>{d.present}/{d.total}</span>
               </div>
             ))}
           </div>
 
           <div className="stats-section">
-            <h3>📈 近7天趋势</h3>
-            <div className="trend-chart">
-              <svg viewBox={`0 0 ${stats.trend.length * 60} 140`} className="trend-svg">
-                {[0, 0.25, 0.5, 0.75, 1].map((r, i) => (
-                  <line key={i} x1="0" y1={120 - r * 100} x2={stats.trend.length * 60} y2={120 - r * 100} stroke="#eee" strokeWidth="0.5" />
-                ))}
-                <polyline fill="none" stroke="#52c41a" strokeWidth="2" points={stats.trend.map((d, i) => `${i * 60 + 30},${120 - (d.present / Math.max(...stats.trend.map(t => t.present), 1)) * 100}`).join(' ')} />
-                <polyline fill="none" stroke="#ff4d4f" strokeWidth="2" strokeDasharray="4,2" points={stats.trend.map((d, i) => `${i * 60 + 30},${120 - (d.absent / Math.max(...stats.trend.map(t => t.absent), 1)) * 100}`).join(' ')} />
-                <polyline fill="none" stroke="#faad14" strokeWidth="2" strokeDasharray="2,2" points={stats.trend.map((d, i) => `${i * 60 + 30},${120 - (d.late / Math.max(...stats.trend.map(t => t.late), 1)) * 100}`).join(' ')} />
-                {stats.trend.map((d, i) => (
-                  <g key={i}>
-                    <circle cx={i * 60 + 30} cy={120 - (d.present / Math.max(...stats.trend.map(t => t.present), 1)) * 100} r="3" fill="#52c41a" />
-                    <text x={i * 60 + 30} y="135" textAnchor="middle" fontSize="8" fill="#999">{d.date}</text>
-                  </g>
-                ))}
-              </svg>
-              <div className="trend-legend">
-                <span><span className="dot" style={{ background: '#52c41a' }} />出勤</span>
-                <span><span className="dot" style={{ background: '#ff4d4f' }} />缺勤</span>
-                <span><span className="dot" style={{ background: '#faad14' }} />迟到</span>
-              </div>
-            </div>
+            <h3>近 7 天趋势</h3>
+            <svg viewBox="0 0 400 120" className="trend-svg">
+              <defs>
+                <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--lake)" stopOpacity="0.15" />
+                  <stop offset="100%" stopColor="var(--lake)" stopOpacity="0.02" />
+                </linearGradient>
+              </defs>
+              <Text style={{ fontSize: 10, fill: 'var(--text-muted)' }}>趋势图需要 SVG 渲染</Text>
+            </svg>
           </div>
         </div>
       )}
