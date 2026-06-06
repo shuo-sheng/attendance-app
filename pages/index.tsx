@@ -66,7 +66,7 @@ const LEAVE_TYPES: Record<string, string> = { annual: '年假', sick: '病假', 
 const STATUS_LABELS: Record<string, string> = { normal: '正常', late: '迟到', early_leave: '早退', absent: '缺勤', leave: '请假', overtime: '加班' }
 const STATUS_COLORS: Record<string, string> = { normal: '#5b8c5a', late: '#d4a853', early_leave: '#e8945a', absent: '#d35a4a', leave: '#5b8c85', overtime: '#5b7b8c' }
 
-function todayStr() { return new Date().toTimeString().split(' ')[0].split('T')[0] }
+function todayStr() { return new Date().toISOString().split('T')[0] }
 function formatDate(d: string) { if (!d) return ''; return d.slice(5) }
 function daysBetween(a: string, b: string) { return Math.floor((new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24)) + 1 }
 
