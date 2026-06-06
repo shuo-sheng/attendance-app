@@ -731,7 +731,7 @@ export default function AdminDashboard() {
                   <stop offset="100%" stopColor="var(--lake)" stopOpacity="0.02" />
                 </linearGradient>
               </defs>
-              <Text style={{ fontSize: 10, fill: 'var(--text-muted)' }}>趋势图需要 SVG 渲染</Text>
+              <text style={{ fontSize: 10, fill: 'var(--text-muted)' }}>趋势图需要 SVG 渲染</text>
             </svg>
           </div>
         </div>
