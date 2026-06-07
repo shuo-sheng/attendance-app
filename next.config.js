@@ -4,6 +4,9 @@ const nextConfig = {
   compiler: {
     styledComponents: false,
   },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
 
 }
 

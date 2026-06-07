@@ -360,7 +360,7 @@ export default function AdminDashboard() {
       else count++
     }
     if (errors.length > 0) setError(`导入完成：成功 ${count} 条，失败 ${errors.length} 条。${errors.slice(0, 3).join('；')}`)
-    else showToast(`成功导入 ${count} 名员工`)
+    else setError(`成功导入 ${count} 名员工`)
     setImportPreview([])
     loadAll()
   }
