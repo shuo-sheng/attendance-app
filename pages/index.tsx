@@ -112,6 +112,15 @@ export default function AdminDashboard() {
   const [monthlyYear, setMonthlyYear] = useState(new Date().getFullYear())
   const [monthlyMonth, setMonthlyMonth] = useState(new Date().getMonth() + 1)
 
+  // Dark mode & batch
+  const [darkMode, setDarkMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [importPreview, setImportPreview] = useState<any[]>([])
+  // Report filters
+  const [reportStart, setReportStart] = useState(() => { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] })
+  const [reportEnd, setReportEnd] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() + 1); d.setDate(0); return d.toISOString().split('T')[0] })
+  const [reportEmployeeId, setReportEmployeeId] = useState('')
+
   // ─── Data Loading ───
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -142,6 +151,8 @@ export default function AdminDashboard() {
 
   useEffect(() => { loadAll() }, [loadAll])
   useEffect(() => { if (error) { const t = setTimeout(() => setError(null), 5000); return () => clearTimeout(t) } }, [error])
+  useEffect(() => { const saved = localStorage.getItem('attendance_theme'); const isDark = saved === 'dark'; setDarkMode(isDark); document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light') }, [])
+  useEffect(() => { document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light'); localStorage.setItem('attendance_theme', darkMode ? 'dark' : 'light') }, [darkMode])
 
   // ─── Employee CRUD ───
   async function saveEmployee() {
@@ -292,6 +303,68 @@ export default function AdminDashboard() {
     if (error) setError(error.message); else loadAll()
   }
 
+  // Batch operations
+  function toggleSelect(id: number) { setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n }) }
+  function selectAll() { const ids = filteredEmployees.map(e => e.id); setSelectedIds(new Set(ids)) }
+  function deselectAll() { setSelectedIds(new Set()) }
+  async function batchDelete() {
+    if (selectedIds.size === 0) return
+    if (!confirm(`确定删除选中的 ${selectedIds.size} 名员工吗？此操作不可撤销。`)) return
+    setLoading(true)
+    const ids = Array.from(selectedIds)
+    for (const id of ids) {
+      const { error } = await supabase.from('employees').delete().eq('id', id)
+      if (error) { setError(`删除员工 ${id} 失败: ${error.message}`); break }
+    }
+    setSelectedIds(new Set())
+    loadAll()
+  }
+  function handleCSVImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string
+      const rows = text.split(/\r?\n/).filter(r => r.trim())
+      if (rows.length < 2) { setError('CSV 至少需要包含表头和一行数据'); return }
+      const headers = rows[0].split(',').map(h => h.trim())
+      const preview = rows.slice(1).map(row => {
+        const cols = row.split(',').map(c => c.trim())
+        const obj: any = {}
+        headers.forEach((h, i) => { obj[h] = cols[i] || '' })
+        return obj
+      })
+      setImportPreview(preview)
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+  async function confirmImport() {
+    if (importPreview.length === 0) return
+    setLoading(true)
+    const errors: string[] = []
+    let count = 0
+    for (const row of importPreview) {
+      const name = row['姓名'] || row['name'] || '未命名'
+      const department = row['部门'] || row['department'] || '技术部'
+      if (!name) continue
+      const { error } = await supabase.from('employees').insert({
+        name, department,
+        position: row['职位'] || row['position'] || '',
+        email: row['邮箱'] || row['email'] || null,
+        phone: row['电话'] || row['phone'] || null,
+        hire_date: row['入职日期'] || row['hire_date'] || null,
+        salary: row['薪资'] || row['salary'] ? parseFloat(row['薪资'] || row['salary']) : null,
+      })
+      if (error) errors.push(`${name}: ${error.message}`)
+      else count++
+    }
+    if (errors.length > 0) setError(`导入完成：成功 ${count} 条，失败 ${errors.length} 条。${errors.slice(0, 3).join('；')}`)
+    else showToast(`成功导入 ${count} 名员工`)
+    setImportPreview([])
+    loadAll()
+  }
+
   function logout() { localStorage.removeItem('attendance_user'); router.push('/login') }
 
   // ─── Derived Data ───
@@ -393,7 +466,7 @@ export default function AdminDashboard() {
     return map
   }, [attendance])
   const weekDays = ['日', '一', '二', '三', '四', '五', '六']
-  const tabLabels: Record<string, string> = { employees: '员工管理', attendance: '每日考勤', calendar: '考勤日历', approvals: '待审批', leave: '请假管理', overtime: '加班记录', makeup: '补卡管理', contracts: '合同管理', stats: '统计报表', monthly: '月度汇总' }
+  const tabLabels: Record<string, string> = { employees: '员工管理', attendance: '每日考勤', calendar: '考勤日历', approvals: '待审批', leave: '请假管理', overtime: '加班记录', makeup: '补卡管理', contracts: '合同管理', stats: '统计报表', report: '考勤明细', monthly: '月度汇总' }
 
   if (authLoading) return <div className="loading"><div className="spinner" /></div>
   if (!user) return null
@@ -404,6 +477,7 @@ export default function AdminDashboard() {
       <header className="header glass-panel">
         <h1>考勤管理系统</h1>
         <div className="header-actions">
+          <button className="theme-toggle" onClick={() => setDarkMode(!darkMode)} title={darkMode ? '浅色模式' : '暗黑模式'}>{darkMode ? '☀' : '☾'}</button>
           {user && <span className="user-info">{user.name}</span>}
           <button className="btn-logout" onClick={logout}>退出</button>
           <button className="btn-refresh" onClick={loadAll} disabled={loading} title="刷新">&#x21bb;</button>
@@ -437,12 +511,45 @@ export default function AdminDashboard() {
               <option value="全部">全部部门</option>
               {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
-            <button className="btn-secondary" onClick={() => downloadCSV(
-              filteredEmployees.map(e => ({ 姓名: e.name, 部门: e.department, 职位: e.position, 邮箱: e.email || '', 入职: e.created_at?.split('T')[0] || '' })),
-              `员工列表_${todayStr()}.csv`
-            )}>导出CSV</button>
-            <button className="btn-primary" onClick={() => { setEditingEmp(null); setEmpForm({ name: '', department: '技术部', position: '', email: '', phone: '', hire_date: '', resignation_date: '', salary: '', performance: '' }); setShowEmpForm(true) }}>添加员工</button>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <button className="btn-secondary" onClick={selectAll}>全选</button>
+              <button className="btn-secondary" onClick={deselectAll}>取消</button>
+              <button className="btn-secondary" onClick={() => downloadCSV(
+                filteredEmployees.map(e => ({ 姓名: e.name, 部门: e.department, 职位: e.position, 邮箱: e.email || '', 入职: e.created_at?.split('T')[0] || '' })),
+                `员工列表_${todayStr()}.csv`
+              )}>导出CSV</button>
+              <button className="btn-primary" onClick={() => { setEditingEmp(null); setEmpForm({ name: '', department: '技术部', position: '', email: '', phone: '', hire_date: '', resignation_date: '', salary: '', performance: '' }); setShowEmpForm(true) }}>添加员工</button>
+            </div>
           </div>
+
+          {selectedIds.size > 0 && (
+            <div className="batch-bar">
+              已选 <strong>{selectedIds.size}</strong> 名员工
+              <button className="btn-small btn-danger" onClick={batchDelete}>批量删除</button>
+            </div>
+          )}
+
+          {/* CSV 导入 */}
+          <label className="import-zone">
+            <input type="file" accept=".csv" onChange={handleCSVImport} />
+            📄 点击此处导入 CSV 文件（表头：姓名,部门,职位,邮箱,电话,入职日期,薪资）
+          </label>
+
+          {importPreview.length > 0 && (
+            <div style={{ marginBottom: 12, padding: 12, border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', background: 'var(--glass-bg-lift)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <strong>预览（{importPreview.length} 条）</strong>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="btn-primary" onClick={confirmImport}>确认导入</button>
+                  <button className="btn-secondary" onClick={() => setImportPreview([])}>取消</button>
+                </div>
+              </div>
+              <div className="data-table" style={{ maxHeight: 200, overflow: 'auto' }}>
+                <table><thead><tr>{Object.keys(importPreview[0]).slice(0, 6).map(k => <th key={k}>{k}</th>)}</tr></thead>
+                <tbody>{importPreview.map((r, i) => <tr key={i}>{Object.values(r).slice(0, 6).map((v: any, j: number) => <td key={j}>{String(v)}</td>)}</tr>)}</tbody></table>
+              </div>
+            </div>
+          )}
 
           {showEmpForm && (
             <div className="modal-overlay" onClick={() => setShowEmpForm(false)}>
@@ -470,10 +577,11 @@ export default function AdminDashboard() {
 
           <div className="data-table">
             <table>
-              <thead><tr><th>姓名</th><th>部门</th><th>职位</th><th>电话</th><th>邮箱</th><th>入职</th><th>薪资</th><th>操作</th></tr></thead>
+              <thead><tr><th style={{ width: 36 }}>#</th><th>姓名</th><th>部门</th><th>职位</th><th>电话</th><th>邮箱</th><th>入职</th><th>薪资</th><th>操作</th></tr></thead>
               <tbody>
                 {filteredEmployees.map(emp => (
                   <tr key={emp.id}>
+                    <td><input type="checkbox" checked={selectedIds.has(emp.id)} onChange={() => toggleSelect(emp.id)} style={{ cursor: 'pointer' }} /></td>
                     <td><strong>{emp.name}</strong></td>
                     <td><span className="tag">{emp.department}</span></td>
                     <td>{emp.position}</td>
@@ -488,7 +596,7 @@ export default function AdminDashboard() {
                     </td>
                   </tr>
                 ))}
-                {filteredEmployees.length === 0 && <tr><td colSpan={8} className="empty">暂无员工</td></tr>}
+                {filteredEmployees.length === 0 && <tr><td colSpan={9} className="empty">暂无员工</td></tr>}
               </tbody>
             </table>
           </div>
@@ -707,7 +815,7 @@ export default function AdminDashboard() {
                     </td>
                   </tr>
                 ))}
-                {leaves.length === 0 && <tr><td colSpan={8} className="empty">暂无请假记录</td></tr>}
+                {leaves.length === 0 && <tr><td colSpan={9} className="empty">暂无请假记录</td></tr>}
               </tbody>
             </table>
           </div>
@@ -803,7 +911,7 @@ export default function AdminDashboard() {
                     </td>
                   </tr>
                 ))}
-                {makeups.length === 0 && <tr><td colSpan={8} className="empty">暂无补卡记录</td></tr>}
+                {makeups.length === 0 && <tr><td colSpan={9} className="empty">暂无补卡记录</td></tr>}
               </tbody>
             </table>
           </div>
@@ -1011,6 +1119,72 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* ─── Report Tab — 考勤明细 ─── */}
+      {tab === 'report' && (() => {
+        const reportData = attendance.filter(a => {
+          if (reportStart && a.date < reportStart) return false
+          if (reportEnd && a.date > reportEnd) return false
+          if (reportEmployeeId && a.employee_id !== Number(reportEmployeeId)) return false
+          return true
+        }).sort((a, b) => b.date.localeCompare(a.date) || a.employee_id - b.employee_id)
+
+        const reportLateCount = reportData.filter(a => a.status === 'late').length
+        const reportAbsentCount = reportData.filter(a => a.status === 'absent').length
+        const reportEarlyCount = reportData.filter(a => a.status === 'early_leave').length
+        const reportTotal = reportData.length || 1
+
+        return (
+          <div className="panel glass-panel">
+            <div className="panel-toolbar">
+              <div className="report-filters">
+                <input type="date" value={reportStart} onChange={e => setReportStart(e.target.value)} />
+                <span>至</span>
+                <input type="date" value={reportEnd} onChange={e => setReportEnd(e.target.value)} />
+                <select value={reportEmployeeId} onChange={e => setReportEmployeeId(e.target.value)}>
+                  <option value="">全部员工</option>
+                  {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <span className="toolbar-info">{reportData.length} 条记录 · 迟到 {reportLateCount} · 早退 {reportEarlyCount} · 缺勤 {reportAbsentCount} · 出勤率 {Math.round(((reportTotal - reportAbsentCount) / reportTotal) * 100)}%</span>
+                <button className="btn-secondary" onClick={() => downloadCSV(
+                  reportData.map(a => {
+                    const emp = employees.find(e => e.id === a.employee_id)
+                    return {
+                      日期: a.date, 姓名: emp?.name || '', 部门: emp?.department || '',
+                      签到: a.check_in || '', 签退: a.check_out || '', 状态: STATUS_LABELS[a.status] || '', 备注: a.notes || ''
+                    }
+                  }), `考勤明细_${reportStart}_${reportEnd}.csv`
+                )}>导出CSV</button>
+              </div>
+            </div>
+            <div className="data-table">
+              <table>
+                <thead><tr><th>日期</th><th>员工</th><th>部门</th><th>签到</th><th>签退</th><th>状态</th><th>备注</th></tr></thead>
+                <tbody>
+                  {reportData.map(a => {
+                    const emp = employees.find(e => e.id === a.employee_id)
+                    const statusColor = a.status === 'normal' ? 'var(--success)' : a.status === 'late' ? 'var(--warning)' : a.status === 'early_leave' ? '#e8945a' : a.status === 'absent' ? 'var(--danger)' : a.status === 'leave' ? '#888' : '#666'
+                    return (
+                      <tr key={a.id}>
+                        <td>{a.date}</td>
+                        <td><strong>{emp?.name || '-'}</strong></td>
+                        <td><span className="tag">{emp?.department || '-'}</span></td>
+                        <td>{a.check_in || '-'}</td>
+                        <td>{a.check_out || '-'}</td>
+                        <td><span style={{ color: statusColor, fontWeight: 600 }}>{STATUS_LABELS[a.status] || '-'}</span></td>
+                        <td style={{ color: 'var(--text-muted)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.notes || '-'}</td>
+                      </tr>
+                    )
+                  })}
+                  {reportData.length === 0 && <tr><td colSpan={7} className="empty">暂无考勤明细</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
