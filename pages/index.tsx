@@ -6,7 +6,8 @@ import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Cart
 // ─── Types ───
 interface Employee {
   id: number; name: string; department: string; position: string; email: string; created_at: string
-  employee_no?: string
+  employee_no?: string; phone?: string; hire_date?: string; resignation_date?: string
+  salary?: number; performance?: string
 }
 interface AttendanceRecord {
   id: number; employee_id: number; date: string; check_in: string | null; check_out: string | null
@@ -71,15 +72,16 @@ export default function AdminDashboard() {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([])
   const [overtimes, setOvertimes] = useState<OvertimeRecord[]>([])
   const [makeups, setMakeups] = useState<MakeupRequest[]>([])
+  const [contracts, setContracts] = useState<Contract[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<'employees' | 'attendance' | 'calendar' | 'approvals' | 'leave' | 'overtime' | 'makeup' | 'stats' | 'monthly'>('employees')
+  const [tab, setTab] = useState<'employees' | 'attendance' | 'calendar' | 'approvals' | 'leave' | 'overtime' | 'makeup' | 'contracts' | 'stats' | 'monthly'>('employees')
   const [search, setSearch] = useState('')
   const [deptFilter, setDeptFilter] = useState('全部')
 
   const [showEmpForm, setShowEmpForm] = useState(false)
   const [editingEmp, setEditingEmp] = useState<Employee | null>(null)
-  const [empForm, setEmpForm] = useState({ name: '', department: '技术部', position: '', email: '' })
+  const [empForm, setEmpForm] = useState({ name: '', department: '技术部', position: '', email: '', phone: '', hire_date: '', resignation_date: '', salary: '', performance: '' })
 
   const [selectedDate, setSelectedDate] = useState(todayStr())
   const [checkNote, setCheckNote] = useState('')
@@ -92,6 +94,9 @@ export default function AdminDashboard() {
 
   const [showMakeupForm, setShowMakeupForm] = useState(false)
   const [makeupForm, setMakeupForm] = useState({ employee_id: '', date: '', check_in: '', check_out: '', reason: '' })
+  const [showContractForm, setShowContractForm] = useState(false)
+  const [editingContract, setEditingContract] = useState<Contract | null>(null)
+  const [contractForm, setContractForm] = useState({ employee_id: '', contract_type: '劳动合同', start_date: '', end_date: '', file_url: '', notes: '' })
 
   const [calYear, setCalYear] = useState(new Date().getFullYear())
   const [calMonth, setCalMonth] = useState(new Date().getMonth())
@@ -104,18 +109,20 @@ export default function AdminDashboard() {
   const loadAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [eRes, aRes, lRes, oRes, mRes] = await Promise.all([
+      const [eRes, aRes, lRes, oRes, mRes, cRes] = await Promise.all([
         supabase.from('employees').select('*').order('created_at', { ascending: false }),
         supabase.from('attendance_records').select('*, employee:employees(*)').order('date', { ascending: false }),
         supabase.from('leave_requests').select('*, employee:employees!leave_requests_employee_id_fkey(*)').order('created_at', { ascending: false }),
         supabase.from('overtime_records').select('*, employee:employees(*)').order('created_at', { ascending: false }),
-        supabase.from('makeup_requests').select('*, employee:employees(*)').order('created_at', { ascending: false })
+        supabase.from('makeup_requests').select('*, employee:employees(*)').order('created_at', { ascending: false }),
+        supabase.from('contracts').select('*, employee:employees(*)').order('created_at', { ascending: false })
       ])
       if (eRes.error) throw eRes.error
       if (aRes.error) throw aRes.error
       if (lRes.error) throw lRes.error
       if (oRes.error) throw oRes.error
       if (mRes.error) throw mRes.error
+      setContracts(cRes?.data || [])
       setEmployees(eRes.data || [])
       setAttendance(aRes.data || [])
       setLeaves(lRes.data || [])
@@ -131,24 +138,50 @@ export default function AdminDashboard() {
   // ─── Employee CRUD ───
   async function saveEmployee() {
     if (!empForm.name.trim() || !empForm.position.trim()) return
+    const payload: any = { ...empForm }
+    if (payload.salary) payload.salary = parseFloat(payload.salary)
     if (editingEmp) {
-      const { error } = await supabase.from('employees').update(empForm).eq('id', editingEmp.id)
+      const { error } = await supabase.from('employees').update(payload).eq('id', editingEmp.id)
       if (error) { setError(error.message); return }
     } else {
-      const { error } = await supabase.from('employees').insert(empForm)
+      const { error } = await supabase.from('employees').insert(payload)
       if (error) { setError(error.message); return }
     }
     setShowEmpForm(false); setEditingEmp(null)
-    setEmpForm({ name: '', department: '技术部', position: '', email: '' }); loadAll()
+    setEmpForm({ name: '', department: '技术部', position: '', email: '', phone: '', hire_date: '', resignation_date: '', salary: '', performance: '' }); loadAll()
   }
   async function deleteEmployee(id: number) {
     if (!confirm('确定删除该员工？')) return
     const { error } = await supabase.from('employees').delete().eq('id', id)
     if (error) setError(error.message); else loadAll()
   }
+
+  // ─── Contract CRUD ───
+  async function saveContract() {
+    if (!contractForm.employee_id || !contractForm.start_date) return
+    if (editingContract) {
+      const { error } = await supabase.from('contracts').update(contractForm).eq('id', editingContract.id)
+      if (error) { setError(error.message); return }
+    } else {
+      const { error } = await supabase.from('contracts').insert(contractForm)
+      if (error) { setError(error.message); return }
+    }
+    setShowContractForm(false); setEditingContract(null)
+    setContractForm({ employee_id: '', contract_type: '劳动合同', start_date: '', end_date: '', file_url: '', notes: '' }); loadAll()
+  }
+  async function deleteContract(id: number) {
+    if (!confirm('确定删除该合同？')) return
+    const { error } = await supabase.from('contracts').delete().eq('id', id)
+    if (error) setError(error.message); else loadAll()
+  }
+  function editContract(c: Contract) {
+    setEditingContract(c)
+    setContractForm({ employee_id: String(c.employee_id), contract_type: c.contract_type, start_date: c.start_date, end_date: c.end_date || '', file_url: c.file_url || '', notes: c.notes || '' })
+    setShowContractForm(true)
+  }
   function editEmployee(emp: Employee) {
     setEditingEmp(emp)
-    setEmpForm({ name: emp.name, department: emp.department, position: emp.position, email: emp.email || '' })
+    setEmpForm({ name: emp.name, department: emp.department, position: emp.position, email: emp.email || '', phone: emp.phone || '', hire_date: emp.hire_date || '', resignation_date: emp.resignation_date || '', salary: emp.salary != null ? String(emp.salary) : '', performance: emp.performance || '' })
     setShowEmpForm(true)
   }
 
@@ -200,10 +233,58 @@ export default function AdminDashboard() {
     const { error } = await supabase.from('leave_requests').update({ status }).eq('id', id)
     if (error) setError(error.message); else loadAll()
   }
+
+  // ─── Contract CRUD ───
+  async function saveContract() {
+    if (!contractForm.employee_id || !contractForm.start_date) return
+    if (editingContract) {
+      const { error } = await supabase.from('contracts').update(contractForm).eq('id', editingContract.id)
+      if (error) { setError(error.message); return }
+    } else {
+      const { error } = await supabase.from('contracts').insert(contractForm)
+      if (error) { setError(error.message); return }
+    }
+    setShowContractForm(false); setEditingContract(null)
+    setContractForm({ employee_id: '', contract_type: '劳动合同', start_date: '', end_date: '', file_url: '', notes: '' }); loadAll()
+  }
+  async function deleteContract(id: number) {
+    if (!confirm('确定删除该合同？')) return
+    const { error } = await supabase.from('contracts').delete().eq('id', id)
+    if (error) setError(error.message); else loadAll()
+  }
+  function editContract(c: Contract) {
+    setEditingContract(c)
+    setContractForm({ employee_id: String(c.employee_id), contract_type: c.contract_type, start_date: c.start_date, end_date: c.end_date || '', file_url: c.file_url || '', notes: c.notes || '' })
+    setShowContractForm(true)
+  }
   async function deleteLeave(id: number) {
     if (!confirm('确定删除？')) return
     const { error } = await supabase.from('leave_requests').delete().eq('id', id)
     if (error) setError(error.message); else loadAll()
+  }
+
+  // ─── Contract CRUD ───
+  async function saveContract() {
+    if (!contractForm.employee_id || !contractForm.start_date) return
+    if (editingContract) {
+      const { error } = await supabase.from('contracts').update(contractForm).eq('id', editingContract.id)
+      if (error) { setError(error.message); return }
+    } else {
+      const { error } = await supabase.from('contracts').insert(contractForm)
+      if (error) { setError(error.message); return }
+    }
+    setShowContractForm(false); setEditingContract(null)
+    setContractForm({ employee_id: '', contract_type: '劳动合同', start_date: '', end_date: '', file_url: '', notes: '' }); loadAll()
+  }
+  async function deleteContract(id: number) {
+    if (!confirm('确定删除该合同？')) return
+    const { error } = await supabase.from('contracts').delete().eq('id', id)
+    if (error) setError(error.message); else loadAll()
+  }
+  function editContract(c: Contract) {
+    setEditingContract(c)
+    setContractForm({ employee_id: String(c.employee_id), contract_type: c.contract_type, start_date: c.start_date, end_date: c.end_date || '', file_url: c.file_url || '', notes: c.notes || '' })
+    setShowContractForm(true)
   }
 
   // ─── Overtime CRUD ───
@@ -217,10 +298,58 @@ export default function AdminDashboard() {
     const { error } = await supabase.from('overtime_records').update({ status }).eq('id', id)
     if (error) setError(error.message); else loadAll()
   }
+
+  // ─── Contract CRUD ───
+  async function saveContract() {
+    if (!contractForm.employee_id || !contractForm.start_date) return
+    if (editingContract) {
+      const { error } = await supabase.from('contracts').update(contractForm).eq('id', editingContract.id)
+      if (error) { setError(error.message); return }
+    } else {
+      const { error } = await supabase.from('contracts').insert(contractForm)
+      if (error) { setError(error.message); return }
+    }
+    setShowContractForm(false); setEditingContract(null)
+    setContractForm({ employee_id: '', contract_type: '劳动合同', start_date: '', end_date: '', file_url: '', notes: '' }); loadAll()
+  }
+  async function deleteContract(id: number) {
+    if (!confirm('确定删除该合同？')) return
+    const { error } = await supabase.from('contracts').delete().eq('id', id)
+    if (error) setError(error.message); else loadAll()
+  }
+  function editContract(c: Contract) {
+    setEditingContract(c)
+    setContractForm({ employee_id: String(c.employee_id), contract_type: c.contract_type, start_date: c.start_date, end_date: c.end_date || '', file_url: c.file_url || '', notes: c.notes || '' })
+    setShowContractForm(true)
+  }
   async function deleteOvertime(id: number) {
     if (!confirm('确定删除？')) return
     const { error } = await supabase.from('overtime_records').delete().eq('id', id)
     if (error) setError(error.message); else loadAll()
+  }
+
+  // ─── Contract CRUD ───
+  async function saveContract() {
+    if (!contractForm.employee_id || !contractForm.start_date) return
+    if (editingContract) {
+      const { error } = await supabase.from('contracts').update(contractForm).eq('id', editingContract.id)
+      if (error) { setError(error.message); return }
+    } else {
+      const { error } = await supabase.from('contracts').insert(contractForm)
+      if (error) { setError(error.message); return }
+    }
+    setShowContractForm(false); setEditingContract(null)
+    setContractForm({ employee_id: '', contract_type: '劳动合同', start_date: '', end_date: '', file_url: '', notes: '' }); loadAll()
+  }
+  async function deleteContract(id: number) {
+    if (!confirm('确定删除该合同？')) return
+    const { error } = await supabase.from('contracts').delete().eq('id', id)
+    if (error) setError(error.message); else loadAll()
+  }
+  function editContract(c: Contract) {
+    setEditingContract(c)
+    setContractForm({ employee_id: String(c.employee_id), contract_type: c.contract_type, start_date: c.start_date, end_date: c.end_date || '', file_url: c.file_url || '', notes: c.notes || '' })
+    setShowContractForm(true)
   }
 
   // ─── Makeup CRUD ───
@@ -234,10 +363,58 @@ export default function AdminDashboard() {
     const { error } = await supabase.from('makeup_requests').update({ status }).eq('id', id)
     if (error) setError(error.message); else loadAll()
   }
+
+  // ─── Contract CRUD ───
+  async function saveContract() {
+    if (!contractForm.employee_id || !contractForm.start_date) return
+    if (editingContract) {
+      const { error } = await supabase.from('contracts').update(contractForm).eq('id', editingContract.id)
+      if (error) { setError(error.message); return }
+    } else {
+      const { error } = await supabase.from('contracts').insert(contractForm)
+      if (error) { setError(error.message); return }
+    }
+    setShowContractForm(false); setEditingContract(null)
+    setContractForm({ employee_id: '', contract_type: '劳动合同', start_date: '', end_date: '', file_url: '', notes: '' }); loadAll()
+  }
+  async function deleteContract(id: number) {
+    if (!confirm('确定删除该合同？')) return
+    const { error } = await supabase.from('contracts').delete().eq('id', id)
+    if (error) setError(error.message); else loadAll()
+  }
+  function editContract(c: Contract) {
+    setEditingContract(c)
+    setContractForm({ employee_id: String(c.employee_id), contract_type: c.contract_type, start_date: c.start_date, end_date: c.end_date || '', file_url: c.file_url || '', notes: c.notes || '' })
+    setShowContractForm(true)
+  }
   async function deleteMakeup(id: number) {
     if (!confirm('确定删除？')) return
     const { error } = await supabase.from('makeup_requests').delete().eq('id', id)
     if (error) setError(error.message); else loadAll()
+  }
+
+  // ─── Contract CRUD ───
+  async function saveContract() {
+    if (!contractForm.employee_id || !contractForm.start_date) return
+    if (editingContract) {
+      const { error } = await supabase.from('contracts').update(contractForm).eq('id', editingContract.id)
+      if (error) { setError(error.message); return }
+    } else {
+      const { error } = await supabase.from('contracts').insert(contractForm)
+      if (error) { setError(error.message); return }
+    }
+    setShowContractForm(false); setEditingContract(null)
+    setContractForm({ employee_id: '', contract_type: '劳动合同', start_date: '', end_date: '', file_url: '', notes: '' }); loadAll()
+  }
+  async function deleteContract(id: number) {
+    if (!confirm('确定删除该合同？')) return
+    const { error } = await supabase.from('contracts').delete().eq('id', id)
+    if (error) setError(error.message); else loadAll()
+  }
+  function editContract(c: Contract) {
+    setEditingContract(c)
+    setContractForm({ employee_id: String(c.employee_id), contract_type: c.contract_type, start_date: c.start_date, end_date: c.end_date || '', file_url: c.file_url || '', notes: c.notes || '' })
+    setShowContractForm(true)
   }
 
   function logout() { localStorage.removeItem('attendance_user'); router.push('/login') }
@@ -341,7 +518,7 @@ export default function AdminDashboard() {
     return map
   }, [attendance])
   const weekDays = ['日', '一', '二', '三', '四', '五', '六']
-  const tabLabels: Record<string, string> = { employees: '员工管理', attendance: '每日考勤', calendar: '考勤日历', approvals: '待审批', leave: '请假管理', overtime: '加班记录', makeup: '补卡管理', stats: '统计报表', monthly: '月度汇总' }
+  const tabLabels: Record<string, string> = { employees: '员工管理', attendance: '每日考勤', calendar: '考勤日历', approvals: '待审批', leave: '请假管理', overtime: '加班记录', makeup: '补卡管理', contracts: '合同管理', stats: '统计报表', monthly: '月度汇总' }
 
   if (authLoading) return <div className="loading"><div className="spinner" /></div>
   if (!user) return null
@@ -389,7 +566,7 @@ export default function AdminDashboard() {
               filteredEmployees.map(e => ({ 姓名: e.name, 部门: e.department, 职位: e.position, 邮箱: e.email || '', 入职: e.created_at?.split('T')[0] || '' })),
               `员工列表_${todayStr()}.csv`
             )}>导出CSV</button>
-            <button className="btn-primary" onClick={() => { setEditingEmp(null); setEmpForm({ name: '', department: '技术部', position: '', email: '' }); setShowEmpForm(true) }}>添加员工</button>
+            <button className="btn-primary" onClick={() => { setEditingEmp(null); setEmpForm({ name: '', department: '技术部', position: '', email: '', phone: '', hire_date: '', resignation_date: '', salary: '', performance: '' }); setShowEmpForm(true) }}>添加员工</button>
           </div>
 
           {showEmpForm && (
@@ -400,6 +577,18 @@ export default function AdminDashboard() {
                 <select value={empForm.department} onChange={e => setEmpForm({ ...empForm, department: e.target.value })}>{DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}</select>
                 <input placeholder="职位" value={empForm.position} onChange={e => setEmpForm({ ...empForm, position: e.target.value })} />
                 <input placeholder="邮箱" value={empForm.email} onChange={e => setEmpForm({ ...empForm, email: e.target.value })} />
+                <input placeholder="电话" value={empForm.phone} onChange={e => setEmpForm({ ...empForm, phone: e.target.value })} />
+                <input type="date" placeholder="入职日期" value={empForm.hire_date} onChange={e => setEmpForm({ ...empForm, hire_date: e.target.value })} />
+                <input type="date" placeholder="离职日期" value={empForm.resignation_date} onChange={e => setEmpForm({ ...empForm, resignation_date: e.target.value })} />
+                <input type="number" placeholder="薪资（月薪）" value={empForm.salary} onChange={e => setEmpForm({ ...empForm, salary: e.target.value })} step="0.01" />
+                <select value={empForm.performance} onChange={e => setEmpForm({ ...empForm, performance: e.target.value })}>
+                  <option value="">绩效评级</option>
+                  <option value="S">S - 卓越</option>
+                  <option value="A">A - 优秀</option>
+                  <option value="B">B - 良好</option>
+                  <option value="C">C - 待改进</option>
+                  <option value="D">D - 不合格</option>
+                </select>
                 <div className="modal-actions">
                   <button className="btn-secondary" onClick={() => setShowEmpForm(false)}>取消</button>
                   <button className="btn-primary" onClick={saveEmployee}>保存</button>
@@ -410,22 +599,23 @@ export default function AdminDashboard() {
 
           <div className="data-table">
             <table>
-              <thead><tr><th>姓名</th><th>部门</th><th>职位</th><th>邮箱</th><th>入职</th><th>操作</th></tr></thead>
+              <thead><tr><th>姓名</th><th>部门</th><th>职位</th><th>电话</th><th>入职</th><th>薪资</th><th>操作</th></tr></thead>
               <tbody>
                 {filteredEmployees.map(emp => (
                   <tr key={emp.id}>
                     <td><strong>{emp.name}</strong></td>
                     <td><span className="tag">{emp.department}</span></td>
                     <td>{emp.position}</td>
-                    <td>{emp.email || '-'}</td>
-                    <td>{formatDate(emp.created_at?.split('T')[0])}</td>
+                    <td className="cell-truncate">{emp.phone || '-'}</td>
+                    <td>{formatDate((emp.hire_date || emp.created_at)?.split('T')[0])}</td>
+                    <td>{emp.salary != null ? '¥' + emp.salary.toLocaleString() : '-'}</td>
                     <td>
                       <button className="btn-small" onClick={() => editEmployee(emp)}>编辑</button>
                       <button className="btn-small btn-danger" onClick={() => deleteEmployee(emp.id)}>删除</button>
                     </td>
                   </tr>
                 ))}
-                {filteredEmployees.length === 0 && <tr><td colSpan={6} className="empty">暂无员工</td></tr>}
+                {filteredEmployees.length === 0 && <tr><td colSpan={7} className="empty">暂无员工</td></tr>}
               </tbody>
             </table>
           </div>
@@ -741,6 +931,69 @@ export default function AdminDashboard() {
                   </tr>
                 ))}
                 {makeups.length === 0 && <tr><td colSpan={8} className="empty">暂无补卡记录</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Contracts Tab ─── */}
+      {tab === 'contracts' && (
+        <div className="panel glass-panel">
+          <div className="panel-toolbar">
+            <button className="btn-primary" onClick={() => { setEditingContract(null); setContractForm({ employee_id: '', contract_type: '劳动合同', start_date: '', end_date: '', file_url: '', notes: '' }); setShowContractForm(true) }}>新增合同</button>
+            <button className="btn-secondary" onClick={() => downloadCSV(
+              contracts.map(c => ({ 员工: c.employee?.name || '', 部门: c.employee?.department || '', 类型: c.contract_type, 开始: c.start_date, 结束: c.end_date || '无固定', 状态: c.status })), `合同列表_${todayStr()}.csv`
+            )}>导出CSV</button>
+            <span className="toolbar-info">{contracts.length} 份合同</span>
+          </div>
+
+          {showContractForm && (
+            <div className="modal-overlay" onClick={() => setShowContractForm(false)}>
+              <div className="modal" onClick={e => e.stopPropagation()}>
+                <h3>{editingContract ? '编辑合同' : '新增合同'}</h3>
+                <select value={contractForm.employee_id} onChange={e => setContractForm({ ...contractForm, employee_id: e.target.value })}>
+                  <option value="">选择员工</option>
+                  {employees.map(e => <option key={e.id} value={e.id}>{e.name} ({e.department})</option>)}
+                </select>
+                <select value={contractForm.contract_type} onChange={e => setContractForm({ ...contractForm, contract_type: e.target.value })}>
+                  <option value="劳动合同">劳动合同</option>
+                  <option value="保密协议">保密协议</option>
+                  <option value="竞业协议">竞业协议</option>
+                  <option value="实习协议">实习协议</option>
+                  <option value="劳务合同">劳务合同</option>
+                </select>
+                <input type="date" placeholder="开始日期" value={contractForm.start_date} onChange={e => setContractForm({ ...contractForm, start_date: e.target.value })} />
+                <input type="date" placeholder="结束日期（可选）" value={contractForm.end_date} onChange={e => setContractForm({ ...contractForm, end_date: e.target.value })} />
+                <input placeholder="文件链接（可选）" value={contractForm.file_url} onChange={e => setContractForm({ ...contractForm, file_url: e.target.value })} />
+                <textarea placeholder="备注" value={contractForm.notes} onChange={e => setContractForm({ ...contractForm, notes: e.target.value })} rows={2} />
+                <div className="modal-actions">
+                  <button className="btn-secondary" onClick={() => setShowContractForm(false)}>取消</button>
+                  <button className="btn-primary" onClick={saveContract}>保存</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="data-table">
+            <table>
+              <thead><tr><th>员工</th><th>部门</th><th>类型</th><th>开始日期</th><th>结束日期</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                {contracts.map(c => (
+                  <tr key={c.id}>
+                    <td><strong>{c.employee?.name || '-'}</strong></td>
+                    <td><span className="tag">{c.employee?.department || '-'}</span></td>
+                    <td>{c.contract_type}</td>
+                    <td>{c.start_date}</td>
+                    <td>{c.end_date || '无固定期限'}</td>
+                    <td><span className={`status-badge ${c.status === 'active' ? 'approved' : 'rejected'}`}>{c.status === 'active' ? '有效' : '已终止'}</span></td>
+                    <td>
+                      <button className="btn-small" onClick={() => editContract(c)}>编辑</button>
+                      <button className="btn-small btn-danger" onClick={() => deleteContract(c.id)}>删除</button>
+                    </td>
+                  </tr>
+                ))}
+                {contracts.length === 0 && <tr><td colSpan={7} className="empty">暂无合同</td></tr>}
               </tbody>
             </table>
           </div>
