@@ -6,14 +6,14 @@ interface Employee {
   id: number
   name: string
   employee_no: string
-  department: string
-  position: string
-  role: string
   phone?: string
   hire_date?: string
   resignation_date?: string
   salary?: number
   performance?: string
+  department: string
+  position: string
+  role: string
 }
 
 interface AttendanceRecord {
@@ -35,34 +35,12 @@ interface LeaveRequest {
   reason: string
 }
 
-interface Contract {
-  id: number
-  employee_id: number
-  contract_type: string
-  start_date: string
-  end_date?: string
-  file_url?: string
-  notes?: string
-  status: string
-}
-
 interface OvertimeRecord {
   id: number
   date: string
   hours: number
   status: string
   reason: string
-}
-
-interface Contract {
-  id: number
-  employee_id: number
-  contract_type: string
-  start_date: string
-  end_date?: string
-  file_url?: string
-  notes?: string
-  status: string
 }
 
 interface MakeupRequest {
@@ -75,14 +53,10 @@ interface MakeupRequest {
 }
 
 interface Contract {
-  id: number
-  employee_id: number
-  contract_type: string
-  start_date: string
-  end_date?: string
-  file_url?: string
-  notes?: string
-  status: string
+  id: number; employee_id: number
+  contract_type: string; start_date: string; end_date?: string
+  file_url?: string; notes?: string; status: string
+  created_at: string
 }
 
 const LEAVE_TYPES: Record<string, string> = {
@@ -93,26 +67,13 @@ const STATUS_LABELS: Record<string, string> = {
   normal: '正常', late: '迟到', early_leave: '早退', absent: '缺勤', leave: '请假', overtime: '加班'
 }
 
-const STATUS_CLASSES: Record<string, string> = {
-  normal: 'status-badge approved',
-  late: 'status-badge pending',
-  early_leave: 'status-badge pending',
-  absent: 'status-badge rejected',
-  leave: 'status-badge approved',
-  overtime: 'status-badge approved'
-}
-
-function downloadCSV(rows: Record<string, any>[], filename: string) {
-  if (rows.length === 0) return
-  const headers = Object.keys(rows[0])
-  const headerRow = headers.join(',')
-  const dataRows = rows.map(r => headers.map(h => {
-    const v = r[h]; return v != null ? `"${String(v).replace(/"/g, '""')}"` : ''
-  }).join(','))
-  const blob = new Blob(['\uFEFF' + headerRow + '\n' + dataRows.join('\n')], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a'); a.href = url; a.download = filename; a.click()
-  URL.revokeObjectURL(url)
+const STATUS_COLORS: Record<string, string> = {
+  normal: 'bg-green-100 text-green-800',
+  late: 'bg-yellow-100 text-yellow-800',
+  early_leave: 'bg-orange-100 text-orange-800',
+  absent: 'bg-red-100 text-red-800',
+  leave: 'bg-blue-100 text-blue-800',
+  overtime: 'bg-purple-100 text-purple-800'
 }
 
 export default function EmployeePage() {
@@ -122,6 +83,7 @@ export default function EmployeePage() {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([])
   const [overtimes, setOvertime] = useState<OvertimeRecord[]>([])
   const [makeups, setMakeups] = useState<MakeupRequest[]>([])
+  const [myContracts, setMyContracts] = useState<Contract[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'dashboard' | 'attendance' | 'leave' | 'overtime' | 'makeup'>('dashboard')
   const [checkInLoading, setCheckInLoading] = useState(false)
@@ -146,16 +108,18 @@ export default function EmployeePage() {
     if (!user) return
     setLoading(true)
     try {
-      const [aRes, lRes, oRes, mRes] = await Promise.all([
+      const [aRes, lRes, oRes, mRes, cRes] = await Promise.all([
         supabase.from('attendance_records').select('*').eq('employee_id', user.id).order('date', { ascending: false }),
         supabase.from('leave_requests').select('*').eq('employee_id', user.id).order('created_at', { ascending: false }),
         supabase.from('overtime_records').select('*').eq('employee_id', user.id).order('created_at', { ascending: false }),
-        supabase.from('makeup_requests').select('*').eq('employee_id', user.id).order('created_at', { ascending: false })
+        supabase.from('makeup_requests').select('*').eq('employee_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('contracts').select('*').eq('employee_id', user.id).order('start_date', { ascending: false })
       ])
       setAttendance(aRes.data || [])
       setLeaves(lRes.data || [])
       setOvertime(oRes.data || [])
       setMakeups(mRes.data || [])
+      setMyContracts(cRes.data || [])
     } catch (err) { console.error(err) } finally { setLoading(false) }
   }, [user])
 
@@ -164,9 +128,8 @@ export default function EmployeePage() {
   async function handleCheckIn() {
     if (!user) return
     setCheckInLoading(true)
-    const now = new Date().toTimeString().split(' ')[0]
+    const now = new Date().toISOString()
     const today = new Date().toISOString().split('T')[0]
-  const [contracts, setContracts] = useState<Contract[]>([])
     const hour = new Date().getHours()
     const status = hour >= 9 ? 'late' : 'normal'
     const { data: existing } = await supabase.from('attendance_records').select('*').eq('employee_id', user.id).eq('date', today).single()
@@ -182,9 +145,8 @@ export default function EmployeePage() {
   async function handleCheckOut() {
     if (!user) return
     setCheckOutLoading(true)
-    const now = new Date().toTimeString().split(' ')[0]
+    const now = new Date().toISOString()
     const today = new Date().toISOString().split('T')[0]
-  const [contracts, setContracts] = useState<Contract[]>([])
     const hour = new Date().getHours()
     const { data: existing } = await supabase.from('attendance_records').select('*').eq('employee_id', user.id).eq('date', today).single()
     let status = existing?.status || 'normal'
@@ -231,20 +193,24 @@ export default function EmployeePage() {
     return new Date(t).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
   }
 
-  if (!user) return <div className="loading"><div className="spinner" /></div>
+  if (!user) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>加载中...</div>
 
   const today = new Date().toISOString().split('T')[0]
-  const [contracts, setContracts] = useState<Contract[]>([])
   const todayRecord = attendance.find(a => a.date === today)
   const isCheckedIn = !!todayRecord?.check_in
   const isCheckedOut = !!todayRecord?.check_out
 
-  const tabLabels: Record<string, string> = {
-    dashboard: '工作台', attendance: '考勤记录', leave: '请假', overtime: '加班', makeup: '补卡'
-  }
+  const tabs = [
+    { key: 'dashboard', label: '工作台' },
+    { key: 'attendance', label: '考勤记录' },
+    { key: 'leave', label: '请假' },
+    { key: 'overtime', label: '加班' },
+    { key: 'makeup', label: '补卡' },
+  ]
 
   return (
     <div className="app">
+      {/* Header */}
       <header className="header glass-panel">
         <div>
           <h1>欢迎，{user.name}</h1>
@@ -258,21 +224,23 @@ export default function EmployeePage() {
         </div>
       </header>
 
+      {/* Tabs */}
       <div className="tabs">
-        {Object.entries(tabLabels).map(([key, label]) => (
+        {tabs.map(t => (
           <button
-            key={key}
-            onClick={() => setTab(key as any)}
-            className={`tab${tab === key ? ' active' : ''}`}
+            key={t.key}
+            onClick={() => setTab(t.key as any)}
+            className={`tab${tab === t.key ? ' active' : ''}`}
           >
-            {label}
+            {t.label}
           </button>
         ))}
       </div>
 
-      {/* ─── Dashboard ─── */}
+      {/* Dashboard */}
       {tab === 'dashboard' && (
         <>
+          {/* Clock In/Out */}
           <div className="glass-panel" style={{ padding: 24, marginBottom: 14, textAlign: 'center' }}>
             <h2 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: 16, color: 'var(--text-primary)' }}>
               今日打卡
@@ -281,53 +249,60 @@ export default function EmployeePage() {
               <button
                 onClick={handleCheckIn}
                 disabled={isCheckedIn || checkInLoading}
-                className={`check-btn in`}
                 style={{
-                  background: isCheckedIn ? '#dcfce7' : undefined,
-                  color: isCheckedIn ? '#16a34a' : undefined,
-                  boxShadow: isCheckedIn ? 'none' : undefined,
+                  flex: 1, padding: '16px 0', borderRadius: 'var(--radius-pill)',
+                  fontSize: '1rem', fontWeight: 600, border: 'none', cursor: isCheckedIn ? 'default' : 'pointer',
+                  background: isCheckedIn ? '#dcfce7' : '#1c2c3e',
+                  color: isCheckedIn ? '#16a34a' : '#fff',
+                  transition: 'var(--transition)',
                 }}
               >
-                {isCheckedIn ? '已上班打卡' : checkInLoading ? '打卡中...' : '上班打卡'}
+                {isCheckedIn ? '已上班打卡' : checkInLoading ? '打卡中...' : '📍 上班打卡'}
               </button>
               <button
                 onClick={handleCheckOut}
                 disabled={!isCheckedIn || isCheckedOut || checkOutLoading}
-                className={`check-btn out`}
                 style={{
+                  flex: 1, padding: '16px 0', borderRadius: 'var(--radius-pill)',
+                  fontSize: '1rem', fontWeight: 600, border: 'none',
+                  cursor: (!isCheckedIn || isCheckedOut) ? 'not-allowed' : 'pointer',
                   background: isCheckedOut ? '#dcfce7'
-                    : !isCheckedIn ? 'rgba(0,0,0,0.04)' : undefined,
+                    : !isCheckedIn ? 'rgba(0,0,0,0.04)' : '#1c2c3e',
                   color: isCheckedOut ? '#16a34a'
-                    : !isCheckedIn ? 'var(--text-muted)' : undefined,
-                  boxShadow: isCheckedOut || !isCheckedIn ? 'none' : undefined,
+                    : !isCheckedIn ? 'var(--text-muted)' : '#fff',
+                  transition: 'var(--transition)',
                 }}
               >
-                {isCheckedOut ? '已下班打卡' : checkOutLoading ? '打卡中...' : '下班打卡'}
+                {isCheckedOut ? '已下班打卡' : checkOutLoading ? '打卡中...' : '🏠 下班打卡'}
               </button>
             </div>
             {todayRecord && (
-              <div className="check-info" style={{
+              <div style={{
                 marginTop: 16, padding: '12px 16px',
                 background: 'var(--glass-bg)', borderRadius: 'var(--radius-md)',
-                fontSize: '0.88rem',
+                fontSize: '0.88rem', color: 'var(--text-secondary)',
               }}>
                 上班: {todayRecord.check_in ? fmtTime(todayRecord.check_in) : '未打卡'}
                 {' · '}
                 下班: {todayRecord.check_out ? fmtTime(todayRecord.check_out) : '未打卡'}
                 {' · '}
-                状态: <span className={STATUS_CLASSES[todayRecord.status] || 'status-badge'}>
+                状态: <span className={`px-2 py-0.5 rounded-full text-xs ${STATUS_COLORS[todayRecord.status] || 'bg-gray-100'}`}>
                   {STATUS_LABELS[todayRecord.status] || todayRecord.status}
                 </span>
               </div>
             )}
           </div>
 
+          {/* Stats */}
           <div className="stats-cards">
             {[
               { label: '本月出勤', value: attendance.filter(a => a.status === 'normal' && a.date.startsWith(today.slice(0, 7))).length },
               { label: '本月迟到', value: attendance.filter(a => a.status === 'late' && a.date.startsWith(today.slice(0, 7))).length },
               { label: '请假天数', value: leaves.filter(l => l.status === 'approved').reduce((s, l) => s + (l.days || 0), 0) },
               { label: '加班时长(h)', value: overtimes.filter(o => o.status === 'approved').reduce((s, o) => s + (o.hours || 0), 0) },
+              { label: '电话', value: user.phone || '-' },
+              { label: '入职日期', value: user.hire_date || '-' },
+              { label: '薪资', value: user.salary ? `¥${user.salary.toLocaleString()}` : '-' },
             ].map(stat => (
               <div key={stat.label} className="stat-card">
                 <div className="stat-number">{stat.value}</div>
@@ -336,83 +311,77 @@ export default function EmployeePage() {
             ))}
           </div>
 
+          {/* Contracts */}
+          <div className="glass-panel" style={{ padding: 20, marginBottom: 14 }}>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 12, color: 'var(--text-primary)' }}>
+              我的合同
+            </h3>
+            {myContracts.map(contract => (
+              <div key={contract.id} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '12px 16px', marginBottom: 6,
+                background: 'var(--glass-bg)', borderRadius: 'var(--radius-md)',
+                fontSize: '0.88rem',
+              }}>
+                <div>
+                  <div style={{ fontWeight: 500 }}>{contract.contract_type}</div>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    {contract.start_date} 至 {contract.end_date || '无固定期限'}
+                  </div>
+                  {contract.notes && <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{contract.notes}</div>}
+                </div>
+                <span className={`px-3 py-1 rounded-full text-xs ${
+                  contract.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                }`}>
+                  {contract.status === 'active' ? '生效中' : '已到期'}
+                </span>
+              </div>
+            ))}
+            {myContracts.length === 0 && (
+              <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>暂无合同记录</p>
+            )}
+          </div>
+
+          {/* Recent */}
           <div className="glass-panel" style={{ padding: 20 }}>
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 12, color: 'var(--text-primary)' }}>最近考勤</h3>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 12, color: 'var(--text-primary)' }}>
+              最近考勤
+            </h3>
             {attendance.slice(0, 5).map(record => (
-              <div key={record.id} className="list-item">
+              <div key={record.id} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '10px 14px', marginBottom: 6,
+                background: 'var(--glass-bg)', borderRadius: 'var(--radius-md)',
+                fontSize: '0.88rem',
+              }}>
                 <span>{record.date}</span>
-                <span className={STATUS_CLASSES[record.status] || 'status-badge'}>
+                <span className={`px-2 py-0.5 rounded-full text-xs ${STATUS_COLORS[record.status] || 'bg-gray-100'}`}>
                   {STATUS_LABELS[record.status] || record.status}
                 </span>
               </div>
             ))}
-            {attendance.length === 0 && <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>暂无记录</p>}
+            {attendance.length === 0 && (
+              <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>暂无记录</p>
+            )}
           </div>
         </>
       )}
 
-      {/* ─── My Info ─── */}
-      {tab === 'info' && (
-        <div className="glass-panel panel">
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 16, color: 'var(--text-primary)' }}>个人信息</h3>
-          <div className="stats-cards">
-            {[
-              { label: '姓名', value: user.name },
-              { label: '工号', value: user.employee_no || '-' },
-              { label: '部门', value: user.department },
-              { label: '职位', value: user.position },
-              { label: '电话', value: user.phone || '-' },
-              { label: '入职日期', value: user.hire_date || '-' },
-              { label: '薪资', value: user.salary != null ? '¥' + user.salary.toLocaleString() : '-' },
-              { label: '绩效', value: user.performance || '-' },
-            ].map(item => (
-              <div key={item.label} className="stat-card">
-                <div className="stat-label">{item.label}</div>
-                <div className="stat-number" style={{ fontSize: '1rem', fontWeight: 600, marginTop: 4 }}>{item.value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ─── My Contracts ─── */}
-      {tab === 'contracts' && (
-        <div className="glass-panel panel">
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 16, color: 'var(--text-primary)' }}>我的合同</h3>
-          <div className="data-table">
-            <table>
-              <thead><tr><th>类型</th><th>开始日期</th><th>结束日期</th><th>状态</th><th>备注</th></tr></thead>
-              <tbody>
-                {contracts.map(c => (
-                  <tr key={c.id}>
-                    <td>{c.contract_type}</td>
-                    <td>{c.start_date}</td>
-                    <td>{c.end_date || '无固定期限'}</td>
-                    <td><span className={`status-badge ${c.status === 'active' ? 'approved' : 'rejected'}`}>{c.status === 'active' ? '有效' : '已终止'}</span></td>
-                    <td>{c.notes || '-'}</td>
-                  </tr>
-                ))}
-                {contracts.length === 0 && <tr><td colSpan={5} className="empty">暂无合同</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ─── Attendance ─── */}
+      {/* Attendance */}
       {tab === 'attendance' && (
         <div className="glass-panel panel">
-          <div className="panel-toolbar">
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, flex: 1, color: 'var(--text-primary)' }}>考勤记录</h3>
-            <button className="btn-secondary" onClick={() => downloadCSV(
-              attendance.map(a => ({ 日期: a.date, 上班: fmtTime(a.check_in), 下班: fmtTime(a.check_out), 状态: STATUS_LABELS[a.status] || a.status, 备注: a.notes || '' })),
-              `考勤记录_${user.name}_${today}.csv`
-            )}>导出CSV</button>
-          </div>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 14, color: 'var(--text-primary)' }}>
+            考勤记录
+          </h3>
           <div className="data-table">
             <table>
               <thead>
-                <tr><th>日期</th><th>上班</th><th>下班</th><th>状态</th></tr>
+                <tr>
+                  <th>日期</th>
+                  <th>上班</th>
+                  <th>下班</th>
+                  <th>状态</th>
+                </tr>
               </thead>
               <tbody>
                 {attendance.map(record => (
@@ -420,7 +389,11 @@ export default function EmployeePage() {
                     <td>{record.date}</td>
                     <td>{record.check_in ? fmtTime(record.check_in) : '-'}</td>
                     <td>{record.check_out ? fmtTime(record.check_out) : '-'}</td>
-                    <td><span className={STATUS_CLASSES[record.status] || 'status-badge'}>{STATUS_LABELS[record.status] || record.status}</span></td>
+                    <td>
+                      <span className={`px-2 py-0.5 rounded-full text-xs ${STATUS_COLORS[record.status] || 'bg-gray-100'}`}>
+                        {STATUS_LABELS[record.status] || record.status}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -430,41 +403,42 @@ export default function EmployeePage() {
         </div>
       )}
 
-      {/* ─── Leave ─── */}
+      {/* Leave */}
       {tab === 'leave' && (
         <div className="glass-panel panel">
           <div className="panel-toolbar">
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, flex: 1, color: 'var(--text-primary)' }}>请假申请</h3>
-            <button className="btn-secondary" onClick={() => downloadCSV(
-              leaves.map(l => ({ 类型: LEAVE_TYPES[l.type] || l.type, 开始: l.start_date, 结束: l.end_date, 天数: l.days, 状态: l.status === 'approved' ? '已通过' : l.status === 'rejected' ? '已拒绝' : '审批中', 原因: l.reason || '' })),
-              `请假记录_${user.name}_${today}.csv`
-            )}>导出CSV</button>
-            <button onClick={() => setShowLeaveForm(true)} className="btn-primary">申请请假</button>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, flex: 1, color: 'var(--text-primary)' }}>
+              请假申请
+            </h3>
+            <button onClick={() => setShowLeaveForm(true)} className="btn-primary">+ 申请请假</button>
           </div>
 
           {showLeaveForm && (
-            <div className="inline-form">
-              <div className="form-row">
-                <div className="form-field">
-                  <label>开始日期</label>
-                  <input type="date" value={leaveForm.start_date} onChange={e => setLeaveForm({...leaveForm, start_date: e.target.value})} />
+            <div style={{
+              background: 'var(--glass-bg)', backdropFilter: 'blur(12px)',
+              borderRadius: 'var(--radius-md)', padding: 16, marginBottom: 16,
+            }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>开始日期</label>
+                  <input type="date" value={leaveForm.start_date} onChange={e => setLeaveForm({...leaveForm, start_date: e.target.value})} style={{ width: '100%' }} />
                 </div>
-                <div className="form-field">
-                  <label>结束日期</label>
-                  <input type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({...leaveForm, end_date: e.target.value})} />
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>结束日期</label>
+                  <input type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({...leaveForm, end_date: e.target.value})} style={{ width: '100%' }} />
                 </div>
               </div>
-              <div className="form-field">
-                <label>请假类型</label>
-                <select value={leaveForm.type} onChange={e => setLeaveForm({...leaveForm, type: e.target.value})}>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>请假类型</label>
+                <select value={leaveForm.type} onChange={e => setLeaveForm({...leaveForm, type: e.target.value})} style={{ width: '100%' }}>
                   {Object.entries(LEAVE_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
               </div>
-              <div className="form-field">
-                <label>原因</label>
-                <textarea value={leaveForm.reason} onChange={e => setLeaveForm({...leaveForm, reason: e.target.value})} rows={2} />
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>原因</label>
+                <textarea value={leaveForm.reason} onChange={e => setLeaveForm({...leaveForm, reason: e.target.value})} rows={2} style={{ width: '100%' }} />
               </div>
-              <div className="form-actions">
+              <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={submitLeave} className="btn-primary">提交</button>
                 <button onClick={() => setShowLeaveForm(false)} className="btn-secondary">取消</button>
               </div>
@@ -472,50 +446,62 @@ export default function EmployeePage() {
           )}
 
           {leaves.map(leave => (
-            <div key={leave.id} className="list-item">
-              <div className="list-item-body">
-                <div className="list-item-title">{LEAVE_TYPES[leave.type] || leave.type}</div>
-                <div className="list-item-meta">{leave.start_date} 至 {leave.end_date} · {leave.days}天</div>
-                {leave.reason && <div className="list-item-meta2">{leave.reason}</div>}
+            <div key={leave.id} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '12px 16px', marginBottom: 6,
+              background: 'var(--glass-bg)', borderRadius: 'var(--radius-md)',
+            }}>
+              <div>
+                <div style={{ fontWeight: 500 }}>{LEAVE_TYPES[leave.type] || leave.type}</div>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  {leave.start_date} 至 {leave.end_date} · {leave.days}天
+                </div>
+                {leave.reason && <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{leave.reason}</div>}
               </div>
-              <span className={`status-badge ${leave.status === 'approved' ? 'approved' : leave.status === 'rejected' ? 'rejected' : 'pending'}`}>
+              <span className={`px-3 py-1 rounded-full text-xs ${
+                leave.status === 'approved' ? 'bg-green-100 text-green-700' :
+                leave.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+              }`}>
                 {leave.status === 'approved' ? '已通过' : leave.status === 'rejected' ? '已拒绝' : '审批中'}
               </span>
             </div>
           ))}
-          {leaves.length === 0 && <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>暂无请假记录</p>}
+          {leaves.length === 0 && (
+            <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>暂无请假记录</p>
+          )}
         </div>
       )}
 
-      {/* ─── Overtime ─── */}
+      {/* Overtime */}
       {tab === 'overtime' && (
         <div className="glass-panel panel">
           <div className="panel-toolbar">
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, flex: 1, color: 'var(--text-primary)' }}>加班申请</h3>
-            <button className="btn-secondary" onClick={() => downloadCSV(
-              overtimes.map(o => ({ 日期: o.date, 时长: o.hours + 'h', 状态: o.status === 'approved' ? '已通过' : o.status === 'rejected' ? '已拒绝' : '审批中', 原因: o.reason || '' })),
-              `加班记录_${user.name}_${today}.csv`
-            )}>导出CSV</button>
-            <button onClick={() => setShowOtForm(true)} className="btn-primary">申请加班</button>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, flex: 1, color: 'var(--text-primary)' }}>
+              加班申请
+            </h3>
+            <button onClick={() => setShowOtForm(true)} className="btn-primary">+ 申请加班</button>
           </div>
 
           {showOtForm && (
-            <div className="inline-form">
-              <div className="form-row">
-                <div className="form-field">
-                  <label>日期</label>
-                  <input type="date" value={otForm.date} onChange={e => setOtForm({...otForm, date: e.target.value})} />
+            <div style={{
+              background: 'var(--glass-bg)', backdropFilter: 'blur(12px)',
+              borderRadius: 'var(--radius-md)', padding: 16, marginBottom: 16,
+            }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>日期</label>
+                  <input type="date" value={otForm.date} onChange={e => setOtForm({...otForm, date: e.target.value})} style={{ width: '100%' }} />
                 </div>
-                <div className="form-field">
-                  <label>时长（小时）</label>
-                  <input type="number" step="0.5" value={otForm.hours} onChange={e => setOtForm({...otForm, hours: e.target.value})} />
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>时长（小时）</label>
+                  <input type="number" step="0.5" value={otForm.hours} onChange={e => setOtForm({...otForm, hours: e.target.value})} style={{ width: '100%' }} />
                 </div>
               </div>
-              <div className="form-field">
-                <label>原因</label>
-                <textarea value={otForm.reason} onChange={e => setOtForm({...otForm, reason: e.target.value})} rows={2} />
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>原因</label>
+                <textarea value={otForm.reason} onChange={e => setOtForm({...otForm, reason: e.target.value})} rows={2} style={{ width: '100%' }} />
               </div>
-              <div className="form-actions">
+              <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={submitOvertime} className="btn-primary">提交</button>
                 <button onClick={() => setShowOtForm(false)} className="btn-secondary">取消</button>
               </div>
@@ -523,53 +509,63 @@ export default function EmployeePage() {
           )}
 
           {overtimes.map(ot => (
-            <div key={ot.id} className="list-item">
-              <div className="list-item-body">
-                <div className="list-item-title">{ot.date} · {ot.hours}小时</div>
-                {ot.reason && <div className="list-item-meta2">{ot.reason}</div>}
+            <div key={ot.id} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '12px 16px', marginBottom: 6,
+              background: 'var(--glass-bg)', borderRadius: 'var(--radius-md)',
+            }}>
+              <div>
+                <div style={{ fontWeight: 500 }}>{ot.date} · {ot.hours}小时</div>
+                {ot.reason && <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{ot.reason}</div>}
               </div>
-              <span className={`status-badge ${ot.status === 'approved' ? 'approved' : ot.status === 'rejected' ? 'rejected' : 'pending'}`}>
+              <span className={`px-3 py-1 rounded-full text-xs ${
+                ot.status === 'approved' ? 'bg-green-100 text-green-700' :
+                ot.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+              }`}>
                 {ot.status === 'approved' ? '已通过' : ot.status === 'rejected' ? '已拒绝' : '审批中'}
               </span>
             </div>
           ))}
-          {overtimes.length === 0 && <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>暂无加班记录</p>}
+          {overtimes.length === 0 && (
+            <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>暂无加班记录</p>
+          )}
         </div>
       )}
 
-      {/* ─── Makeup ─── */}
+      {/* Makeup */}
       {tab === 'makeup' && (
         <div className="glass-panel panel">
           <div className="panel-toolbar">
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, flex: 1, color: 'var(--text-primary)' }}>补卡申请</h3>
-            <button className="btn-secondary" onClick={() => downloadCSV(
-              makeups.map(m => ({ 日期: m.date, 上班: m.check_in || '未填', 下班: m.check_out || '未填', 状态: m.status === 'approved' ? '已通过' : m.status === 'rejected' ? '已拒绝' : '审批中', 原因: m.reason || '' })),
-              `补卡记录_${user.name}_${today}.csv`
-            )}>导出CSV</button>
-            <button onClick={() => setShowMakeupForm(true)} className="btn-primary">申请补卡</button>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, flex: 1, color: 'var(--text-primary)' }}>
+              补卡申请
+            </h3>
+            <button onClick={() => setShowMakeupForm(true)} className="btn-primary">+ 申请补卡</button>
           </div>
 
           {showMakeupForm && (
-            <div className="inline-form">
-              <div className="form-field">
-                <label>补卡日期</label>
+            <div style={{
+              background: 'var(--glass-bg)', backdropFilter: 'blur(12px)',
+              borderRadius: 'var(--radius-md)', padding: 16, marginBottom: 16,
+            }}>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>补卡日期</label>
                 <input type="date" value={makeupForm.date} onChange={e => setMakeupForm({...makeupForm, date: e.target.value})} style={{ width: '100%' }} />
               </div>
-              <div className="form-row">
-                <div className="form-field">
-                  <label>上班时间</label>
-                  <input type="time" value={makeupForm.check_in} onChange={e => setMakeupForm({...makeupForm, check_in: e.target.value})} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>上班时间</label>
+                  <input type="time" value={makeupForm.check_in} onChange={e => setMakeupForm({...makeupForm, check_in: e.target.value})} style={{ width: '100%' }} />
                 </div>
-                <div className="form-field">
-                  <label>下班时间</label>
-                  <input type="time" value={makeupForm.check_out} onChange={e => setMakeupForm({...makeupForm, check_out: e.target.value})} />
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>下班时间</label>
+                  <input type="time" value={makeupForm.check_out} onChange={e => setMakeupForm({...makeupForm, check_out: e.target.value})} style={{ width: '100%' }} />
                 </div>
               </div>
-              <div className="form-field">
-                <label>补卡原因</label>
-                <textarea value={makeupForm.reason} onChange={e => setMakeupForm({...makeupForm, reason: e.target.value})} rows={2} />
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>补卡原因</label>
+                <textarea value={makeupForm.reason} onChange={e => setMakeupForm({...makeupForm, reason: e.target.value})} rows={2} style={{ width: '100%' }} />
               </div>
-              <div className="form-actions">
+              <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={submitMakeup} className="btn-primary">提交</button>
                 <button onClick={() => setShowMakeupForm(false)} className="btn-secondary">取消</button>
               </div>
@@ -577,18 +573,29 @@ export default function EmployeePage() {
           )}
 
           {makeups.map(makeup => (
-            <div key={makeup.id} className="list-item">
-              <div className="list-item-body">
-                <div className="list-item-title">{makeup.date}</div>
-                <div className="list-item-meta">上班: {makeup.check_in || '未填'} · 下班: {makeup.check_out || '未填'}</div>
-                {makeup.reason && <div className="list-item-meta2">{makeup.reason}</div>}
+            <div key={makeup.id} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '12px 16px', marginBottom: 6,
+              background: 'var(--glass-bg)', borderRadius: 'var(--radius-md)',
+            }}>
+              <div>
+                <div style={{ fontWeight: 500 }}>{makeup.date}</div>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  上班: {makeup.check_in || '未填'} · 下班: {makeup.check_out || '未填'}
+                </div>
+                {makeup.reason && <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{makeup.reason}</div>}
               </div>
-              <span className={`status-badge ${makeup.status === 'approved' ? 'approved' : makeup.status === 'rejected' ? 'rejected' : 'pending'}`}>
+              <span className={`px-3 py-1 rounded-full text-xs ${
+                makeup.status === 'approved' ? 'bg-green-100 text-green-700' :
+                makeup.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+              }`}>
                 {makeup.status === 'approved' ? '已通过' : makeup.status === 'rejected' ? '已拒绝' : '审批中'}
               </span>
             </div>
           ))}
-          {makeups.length === 0 && <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>暂无补卡记录</p>}
+          {makeups.length === 0 && (
+            <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>暂无补卡记录</p>
+          )}
         </div>
       )}
     </div>
