@@ -165,6 +165,7 @@ export default function AdminDashboard() {
       const { error } = await supabase.from('employees').update(payload).eq('id', editingEmp.id)
       if (error) { setError(error.message); return }
     } else {
+      payload.employee_no = 'EMP' + Date.now().toString(36).toUpperCase().slice(-6)
       const { error } = await supabase.from('employees').insert(payload)
       if (error) { setError(error.message); return }
     }
@@ -344,12 +345,14 @@ export default function AdminDashboard() {
     setLoading(true)
     const errors: string[] = []
     let count = 0
-    for (const row of importPreview) {
+    for (let i = 0; i < importPreview.length; i++) {
+      const row = importPreview[i]
       const name = row['姓名'] || row['name'] || '未命名'
       const department = row['部门'] || row['department'] || '技术部'
       if (!name) continue
+      const employee_no = row['工号'] || row['employee_no'] || 'EMP' + (Date.now() + i).toString(36).toUpperCase().slice(-6)
       const { error } = await supabase.from('employees').insert({
-        name, department,
+        employee_no, name, department,
         position: row['职位'] || row['position'] || '',
         email: row['邮箱'] || row['email'] || null,
         phone: row['电话'] || row['phone'] || null,
@@ -532,7 +535,7 @@ export default function AdminDashboard() {
           {/* CSV 导入 */}
           <label className="import-zone">
             <input type="file" accept=".csv" onChange={handleCSVImport} />
-            📄 点击此处导入 CSV 文件（表头：姓名,部门,职位,邮箱,电话,入职日期,薪资）
+            📄 点击此处导入 CSV 文件（表头：姓名,部门,职位,邮箱,电话,入职日期,薪资,工号可选）
           </label>
 
           {importPreview.length > 0 && (
