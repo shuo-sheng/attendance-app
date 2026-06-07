@@ -1,3 +1,4 @@
+// VERSION_FIX_20260607_B — setSuccess + makeup validation + type field
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabase'
@@ -82,6 +83,7 @@ export default function AdminDashboard() {
   const [contracts, setContracts] = useState<Contract[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [tab, setTab] = useState<'employees' | 'attendance' | 'calendar' | 'approvals' | 'leave' | 'overtime' | 'makeup' | 'stats' | 'monthly' | 'contracts'>('employees')
   const [search, setSearch] = useState('')
   const [deptFilter, setDeptFilter] = useState('全部')
@@ -120,6 +122,8 @@ export default function AdminDashboard() {
   const [reportStart, setReportStart] = useState(() => { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] })
   const [reportEnd, setReportEnd] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() + 1); d.setDate(0); return d.toISOString().split('T')[0] })
   const [reportEmployeeId, setReportEmployeeId] = useState('')
+  const [reportStatus, setReportStatus] = useState('全部')
+  const [monthlyDeptFilter, setMonthlyDeptFilter] = useState('全部')
 
   // ─── Data Loading ───
   const loadAll = useCallback(async () => {
@@ -150,7 +154,21 @@ export default function AdminDashboard() {
   }, [])
 
   useEffect(() => { loadAll() }, [loadAll])
+  // One-time cleanup: strip surrounding quotes from employee names/departments
+  useEffect(() => {
+    if (employees.length === 0) return
+    const dirty = employees.filter(e => {
+      const n = e.name || '', d = e.department || ''
+      return (n.startsWith('"') && n.endsWith('"')) || (d.startsWith('"') && d.endsWith('"'))
+    })
+    if (dirty.length === 0) return
+    Promise.all(dirty.map(e => supabase.from('employees').update({
+      name: (e.name || '').replace(/^"(.*)"$/, '$1'),
+      department: (e.department || '').replace(/^"(.*)"$/, '$1'),
+    }).eq('id', e.id))).then(() => { setError(null); loadAll() })
+  }, [employees.length])
   useEffect(() => { if (error) { const t = setTimeout(() => setError(null), 5000); return () => clearTimeout(t) } }, [error])
+  useEffect(() => { if (success) { const t = setTimeout(() => setSuccess(null), 3000); return () => clearTimeout(t) } }, [success])
   useEffect(() => { const saved = localStorage.getItem('attendance_theme'); const isDark = saved === 'dark'; setDarkMode(isDark); document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light') }, [])
   useEffect(() => { document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light'); localStorage.setItem('attendance_theme', darkMode ? 'dark' : 'light') }, [darkMode])
 
@@ -158,6 +176,9 @@ export default function AdminDashboard() {
   async function saveEmployee() {
     if (!empForm.name.trim() || !empForm.position.trim()) return
     const payload: any = { ...empForm }
+    // Strip surrounding quotes from name/department
+    if (payload.name) payload.name = payload.name.replace(/^"(.*)"$/, '$1')
+    if (payload.department) payload.department = payload.department.replace(/^"(.*)"$/, '$1')
     if (payload.salary) payload.salary = parseFloat(payload.salary)
     if (!payload.hire_date) payload.hire_date = null
     if (!payload.resignation_date) payload.resignation_date = null
@@ -170,7 +191,9 @@ export default function AdminDashboard() {
       if (error) { setError(error.message); return }
     }
     setShowEmpForm(false); setEditingEmp(null)
-    setEmpForm({ name: '', department: '技术部', position: '', email: '', phone: '', hire_date: '', resignation_date: '', salary: '', performance: '' }); loadAll()
+    setEmpForm({ name: '', department: '技术部', position: '', email: '', phone: '', hire_date: '', resignation_date: '', salary: '', performance: '' })
+    setSuccess(editingEmp ? '员工信息已更新' : '员工添加成功')
+    loadAll()
   }
   async function deleteEmployee(id: number) {
     if (!confirm('确定删除该员工？')) return
@@ -289,8 +312,8 @@ export default function AdminDashboard() {
 
   // ─── Makeup CRUD ───
   async function saveMakeup() {
-    if (!makeupForm.employee_id || !makeupForm.date) return
-    const { error } = await supabase.from('makeup_requests').insert({ employee_id: Number(makeupForm.employee_id), date: makeupForm.date, check_in: makeupForm.check_in || null, check_out: makeupForm.check_out || null, reason: makeupForm.reason, status: 'pending' })
+    if (!makeupForm.employee_id || !makeupForm.date) { setError('请选择员工和日期'); return }
+    const { error } = await supabase.from('makeup_requests').insert({ employee_id: Number(makeupForm.employee_id), date: makeupForm.date, check_in: makeupForm.check_in || null, check_out: makeupForm.check_out || null, reason: makeupForm.reason, type: '补卡', status: 'pending' })
     if (error) { setError(error.message); return }
     setShowMakeupForm(false); setMakeupForm({ employee_id: '', date: '', check_in: '', check_out: '', reason: '' }); loadAll()
   }
@@ -330,7 +353,7 @@ export default function AdminDashboard() {
       if (rows.length < 2) { setError('CSV 至少需要包含表头和一行数据'); return }
       const headers = rows[0].split(',').map(h => h.trim())
       const preview = rows.slice(1).map(row => {
-        const cols = row.split(',').map(c => c.trim())
+        const cols = row.split(',').map(c => c.trim().replace(/^"(.*)"$/, '$1'))
         const obj: any = {}
         headers.forEach((h, i) => { obj[h] = cols[i] || '' })
         return obj
@@ -363,7 +386,7 @@ export default function AdminDashboard() {
       else count++
     }
     if (errors.length > 0) setError(`导入完成：成功 ${count} 条，失败 ${errors.length} 条。${errors.slice(0, 3).join('；')}`)
-    else setError(`成功导入 ${count} 名员工`)
+    else setSuccess(`成功导入 ${count} 名员工`)
     setImportPreview([])
     loadAll()
   }
@@ -455,6 +478,24 @@ export default function AdminDashboard() {
     })
   }, [employees, attendance, overtimes, monthlyYear, monthlyMonth])
 
+  // Monthly stats cards
+  const monthlyStats = useMemo(() => {
+    const prefix = `${monthlyYear}-${String(monthlyMonth).padStart(2, '0')}`
+    const m = attendance.filter(a => a.date.startsWith(prefix))
+    const total = m.length || 1
+    const lat = m.filter(a => a.status === 'late').length
+    const abs = m.filter(a => a.status === 'absent' || a.status === 'leave').length
+    const normal = m.filter(a => a.status === 'normal' || a.status === 'overtime').length
+    const overTotal = overtimes.filter(o => o.date.startsWith(prefix) && o.status === 'approved').reduce((s, o) => s + (o.hours || 0), 0)
+    return { rate: Math.round((normal / total) * 100), lat, abs, overTotal }
+  }, [attendance, overtimes, monthlyYear, monthlyMonth])
+
+  // Filtered monthly by department
+  const filteredMonthly = useMemo(() => {
+    if (monthlyDeptFilter === '全部') return monthlySummary
+    return monthlySummary.filter(s => s.department === monthlyDeptFilter)
+  }, [monthlySummary, monthlyDeptFilter])
+
   // Calendar
   const calDays = useMemo(() => {
     const first = new Date(calYear, calMonth, 1); const last = new Date(calYear, calMonth + 1, 0)
@@ -491,6 +532,12 @@ export default function AdminDashboard() {
         <div className="error-banner">
           <span>{error}</span>
           <button onClick={() => setError(null)}>&times;</button>
+        </div>
+      )}
+      {success && (
+        <div className="success-banner">
+          <span>{success}</span>
+          <button onClick={() => setSuccess(null)}>&times;</button>
         </div>
       )}
 

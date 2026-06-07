@@ -304,6 +304,19 @@ select {
   cursor: pointer; font-size: 16px; padding: 2px 6px;
 }
 
+/* ─── Success Banner ─── */
+.success-banner {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 18px; margin-bottom: var(--gap);
+  border-radius: var(--radius-md);
+  background: rgba(52, 168, 83, 0.08); color: #34a853;
+  font-size: 13.5px; font-weight: 500;
+}
+.success-banner button {
+  background: none; border: none; color: #34a853;
+  cursor: pointer; font-size: 16px; padding: 2px 6px;
+}
+
 /* ─── Modal ─── */
 .modal-overlay {
   position: fixed; inset: 0; z-index: 200;
@@ -678,6 +691,10 @@ body > script:last-of-type { display: none !important; }
 [data-theme="dark"] .error-banner {
   background: rgba(211, 90, 74, 0.15);
   border-color: rgba(211, 90, 74, 0.3);
+}
+
+[data-theme="dark"] .success-banner {
+  background: rgba(52, 168, 83, 0.15);
 }
 
 /* 批量操作栏 */
