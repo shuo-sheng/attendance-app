@@ -9,6 +9,11 @@ interface Employee {
   department: string
   position: string
   role: string
+  phone?: string
+  hire_date?: string
+  resignation_date?: string
+  salary?: number
+  performance?: string
 }
 
 interface AttendanceRecord {
@@ -30,12 +35,34 @@ interface LeaveRequest {
   reason: string
 }
 
+interface Contract {
+  id: number
+  employee_id: number
+  contract_type: string
+  start_date: string
+  end_date?: string
+  file_url?: string
+  notes?: string
+  status: string
+}
+
 interface OvertimeRecord {
   id: number
   date: string
   hours: number
   status: string
   reason: string
+}
+
+interface Contract {
+  id: number
+  employee_id: number
+  contract_type: string
+  start_date: string
+  end_date?: string
+  file_url?: string
+  notes?: string
+  status: string
 }
 
 interface MakeupRequest {
@@ -45,6 +72,17 @@ interface MakeupRequest {
   check_out: string | null
   status: string
   reason: string
+}
+
+interface Contract {
+  id: number
+  employee_id: number
+  contract_type: string
+  start_date: string
+  end_date?: string
+  file_url?: string
+  notes?: string
+  status: string
 }
 
 const LEAVE_TYPES: Record<string, string> = {
@@ -128,6 +166,7 @@ export default function EmployeePage() {
     setCheckInLoading(true)
     const now = new Date().toTimeString().split(' ')[0]
     const today = new Date().toISOString().split('T')[0]
+  const [contracts, setContracts] = useState<Contract[]>([])
     const hour = new Date().getHours()
     const status = hour >= 9 ? 'late' : 'normal'
     const { data: existing } = await supabase.from('attendance_records').select('*').eq('employee_id', user.id).eq('date', today).single()
@@ -145,6 +184,7 @@ export default function EmployeePage() {
     setCheckOutLoading(true)
     const now = new Date().toTimeString().split(' ')[0]
     const today = new Date().toISOString().split('T')[0]
+  const [contracts, setContracts] = useState<Contract[]>([])
     const hour = new Date().getHours()
     const { data: existing } = await supabase.from('attendance_records').select('*').eq('employee_id', user.id).eq('date', today).single()
     let status = existing?.status || 'normal'
@@ -194,6 +234,7 @@ export default function EmployeePage() {
   if (!user) return <div className="loading"><div className="spinner" /></div>
 
   const today = new Date().toISOString().split('T')[0]
+  const [contracts, setContracts] = useState<Contract[]>([])
   const todayRecord = attendance.find(a => a.date === today)
   const isCheckedIn = !!todayRecord?.check_in
   const isCheckedOut = !!todayRecord?.check_out
@@ -308,6 +349,54 @@ export default function EmployeePage() {
             {attendance.length === 0 && <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>暂无记录</p>}
           </div>
         </>
+      )}
+
+      {/* ─── My Info ─── */}
+      {tab === 'info' && (
+        <div className="glass-panel panel">
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 16, color: 'var(--text-primary)' }}>个人信息</h3>
+          <div className="stats-cards">
+            {[
+              { label: '姓名', value: user.name },
+              { label: '工号', value: user.employee_no || '-' },
+              { label: '部门', value: user.department },
+              { label: '职位', value: user.position },
+              { label: '电话', value: user.phone || '-' },
+              { label: '入职日期', value: user.hire_date || '-' },
+              { label: '薪资', value: user.salary != null ? '¥' + user.salary.toLocaleString() : '-' },
+              { label: '绩效', value: user.performance || '-' },
+            ].map(item => (
+              <div key={item.label} className="stat-card">
+                <div className="stat-label">{item.label}</div>
+                <div className="stat-number" style={{ fontSize: '1rem', fontWeight: 600, marginTop: 4 }}>{item.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ─── My Contracts ─── */}
+      {tab === 'contracts' && (
+        <div className="glass-panel panel">
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 16, color: 'var(--text-primary)' }}>我的合同</h3>
+          <div className="data-table">
+            <table>
+              <thead><tr><th>类型</th><th>开始日期</th><th>结束日期</th><th>状态</th><th>备注</th></tr></thead>
+              <tbody>
+                {contracts.map(c => (
+                  <tr key={c.id}>
+                    <td>{c.contract_type}</td>
+                    <td>{c.start_date}</td>
+                    <td>{c.end_date || '无固定期限'}</td>
+                    <td><span className={`status-badge ${c.status === 'active' ? 'approved' : 'rejected'}`}>{c.status === 'active' ? '有效' : '已终止'}</span></td>
+                    <td>{c.notes || '-'}</td>
+                  </tr>
+                ))}
+                {contracts.length === 0 && <tr><td colSpan={5} className="empty">暂无合同</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       {/* ─── Attendance ─── */}
