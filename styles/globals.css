@@ -563,3 +563,181 @@ body > script:last-of-type { display: none !important; }
   .toast-container { top: 8px; right: 8px; left: 8px; }
   .toast { max-width: none; font-size: 13px; }
 }
+
+
+/* ════════════════════════════════════════════════════════════
+   暗黑模式
+   ════════════════════════════════════════════════════════════ */
+[data-theme="dark"] {
+  --ink: #e0e0e0;
+  --paper: #1a1a2e;
+  --lake: #7ec8c0;
+  --forest: #7db86a;
+  --sun: #e8c560;
+  --sakura: #e0958a;
+
+  --primary: var(--lake);
+  --primary-hover: #6db8b0;
+  --danger: #e06050;
+  --danger-hover: #c85040;
+  --success: #7db86a;
+  --warning: var(--sun);
+
+  --text-primary: #e0e0e0;
+  --text-secondary: #999;
+  --text-muted: #666;
+
+  --glass-bg: rgba(26, 26, 46, 0.85);
+  --glass-bg-lift: rgba(35, 35, 55, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.08);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.20);
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.30);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="dark"] body {
+  background: #0f0f1a;
+}
+
+[data-theme="dark"] .header {
+  background: rgba(26, 26, 46, 0.9);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .tab {
+  color: #999;
+}
+[data-theme="dark"] .tab:hover {
+  color: #ccc;
+  background: rgba(255, 255, 255, 0.04);
+}
+[data-theme="dark"] .tab.active {
+  color: var(--primary);
+  background: rgba(126, 200, 192, 0.1);
+}
+
+[data-theme="dark"] .modal {
+  background: rgba(26, 26, 46, 0.95);
+}
+[data-theme="dark"] .modal h3 {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+[data-theme="dark"] input:focus,
+[data-theme="dark"] select:focus,
+[data-theme="dark"] textarea:focus {
+  border-color: var(--primary);
+}
+
+[data-theme="dark"] .data-table table th {
+  background: rgba(255, 255, 255, 0.04);
+  color: #999;
+}
+[data-theme="dark"] .data-table table td {
+  border-bottom-color: rgba(255, 255, 255, 0.04);
+}
+[data-theme="dark"] .data-table table tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.02);
+}
+[data-theme="dark"] .data-table table tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+[data-theme="dark"] .btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+[data-theme="dark"] .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .tag {
+  background: rgba(255, 255, 255, 0.06);
+  color: #999;
+}
+
+[data-theme="dark"] .empty {
+  color: #555;
+}
+
+[data-theme="dark"] .spinner {
+  border-color: rgba(255, 255, 255, 0.1);
+  border-top-color: var(--primary);
+}
+
+[data-theme="dark"] .error-banner {
+  background: rgba(211, 90, 74, 0.15);
+  border-color: rgba(211, 90, 74, 0.3);
+}
+
+/* 批量操作栏 */
+.batch-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px; border-radius: var(--radius-sm);
+  background: rgba(211, 90, 74, 0.08); border: 1px solid rgba(211, 90, 74, 0.2);
+  margin-bottom: 12px; font-size: 13px; color: var(--text-secondary);
+}
+.batch-bar strong { color: var(--danger); margin: 0 2px; }
+[data-theme="dark"] .batch-bar {
+  background: rgba(211, 90, 74, 0.12);
+  border-color: rgba(211, 90, 74, 0.25);
+}
+
+/* 导入区域 */
+.import-zone {
+  border: 2px dashed var(--glass-border);
+  border-radius: var(--radius-md); padding: 20px;
+  text-align: center; color: var(--text-muted); font-size: 14px;
+  cursor: pointer; transition: all var(--ease-out);
+  margin-bottom: 12px;
+}
+.import-zone:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: rgba(91, 140, 133, 0.04);
+}
+[data-theme="dark"] .import-zone {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+[data-theme="dark"] .import-zone:hover {
+  background: rgba(126, 200, 192, 0.06);
+}
+.import-zone input[type="file"] { display: none; }
+
+/* 暗黑模式切换按钮 */
+.theme-toggle {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-lift);
+  color: var(--text-secondary); font-size: 16px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all var(--ease-out);
+}
+.theme-toggle:hover {
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  transform: rotate(15deg);
+}
+
+/* report filters */
+.report-filters {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+}
+.report-filters input,
+.report-filters select {
+  padding: 5px 10px; font-size: 13px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-lift);
+  color: var(--text-primary);
+}
