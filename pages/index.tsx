@@ -121,18 +121,21 @@ export default function AdminDashboard() {
         supabase.from('attendance_records').select('*, employee:employees(*)').order('date', { ascending: false }),
         supabase.from('leave_requests').select('*, employee:employees!leave_requests_employee_id_fkey(*)').order('created_at', { ascending: false }),
         supabase.from('overtime_records').select('*, employee:employees(*)').order('created_at', { ascending: false }),
-        supabase.from('makeup_requests').select('*, employee:employees(*)').order('created_at', { ascending: false })
+        supabase.from('makeup_requests').select('*, employee:employees(*)').order('created_at', { ascending: false }),
+        supabase.from('contracts').select('*, employee:employees(*)').order('created_at', { ascending: false })
       ])
       if (eRes.error) throw eRes.error
       if (aRes.error) throw aRes.error
       if (lRes.error) throw lRes.error
       if (oRes.error) throw oRes.error
+      if (cRes.error) throw cRes.error
       if (mRes.error) throw mRes.error
       setEmployees(eRes.data || [])
       setAttendance(aRes.data || [])
       setLeaves(lRes.data || [])
       setOvertimes(oRes.data || [])
       setMakeups(mRes.data || [])
+      setContracts(cRes.data || [])
       setError(null)
     } catch (err: any) { setError(err.message || '加载失败') } finally { setLoading(false) }
   }, [])
@@ -168,6 +171,39 @@ export default function AdminDashboard() {
     setShowEmpForm(true)
   }
 
+
+  // ─── Contract CRUD ───
+  async function saveContract() {
+    if (!contractForm.employee_id || !contractForm.start_date) return
+    const payload: any = { ...contractForm, employee_id: Number(contractForm.employee_id) }
+    if (editingContract) {
+      const { error } = await supabase.from('contracts').update(payload).eq('id', editingContract.id)
+      if (error) { setError(error.message); return }
+    } else {
+      const { error } = await supabase.from('contracts').insert(payload)
+      if (error) { setError(error.message); return }
+    }
+    setShowContractForm(false); setEditingContract(null)
+    setContractForm({ employee_id: '', contract_type: '劳动合同', start_date: '', end_date: '', file_url: '', notes: '' })
+    loadAll()
+  }
+  function editContract(c: Contract) {
+    setEditingContract(c)
+    setContractForm({
+      employee_id: String(c.employee_id),
+      contract_type: c.contract_type,
+      start_date: c.start_date,
+      end_date: c.end_date || '',
+      file_url: c.file_url || '',
+      notes: c.notes || ''
+    })
+    setShowContractForm(true)
+  }
+  async function deleteContract(id: number) {
+    if (!confirm('确定删除该合同？')) return
+    const { error } = await supabase.from('contracts').delete().eq('id', id)
+    if (error) setError(error.message); else loadAll()
+  }
   // ─── Attendance ───
   async function checkIn(empId: number) {
     const { data: existing } = await supabase.from('attendance_records').select('*').eq('employee_id', empId).eq('date', selectedDate).single()
