@@ -1080,16 +1080,30 @@ export default function AdminDashboard() {
       {/* ─── Monthly Summary Tab ─── */}
       {tab === 'monthly' && (
         <div className="panel glass-panel">
+          {/* Stats cards */}
+          <div className="stats-cards" style={{ marginBottom: 14 }}>
+            <div className="stat-card"><div className="stat-label">出勤率</div><div className="stat-number" style={{ color: monthlyStats.rate >= 90 ? 'var(--success)' : monthlyStats.rate >= 70 ? 'var(--warning)' : 'var(--danger)' }}>{monthlyStats.rate}%</div></div>
+            <div className="stat-card"><div className="stat-label">迟到人次</div><div className="stat-number" style={{ color: monthlyStats.lat > 0 ? 'var(--warning)' : 'var(--text-secondary)' }}>{monthlyStats.lat}</div></div>
+            <div className="stat-card"><div className="stat-label">缺勤人次</div><div className="stat-number" style={{ color: monthlyStats.abs > 0 ? 'var(--danger)' : 'var(--text-secondary)' }}>{monthlyStats.abs}</div></div>
+            <div className="stat-card"><div className="stat-label">加班(h)</div><div className="stat-number" style={{ color: monthlyStats.overTotal > 0 ? '#5b7b8c' : 'var(--text-secondary)' }}>{monthlyStats.overTotal.toFixed(1)}</div></div>
+          </div>
+
           <div className="panel-toolbar">
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, flex: 1, color: 'var(--text-primary)' }}>月度汇总</h3>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, flex: 1, color: 'var(--text-primary)' }}>{monthlyYear}年{monthlyMonth}月汇总</h3>
+            <button className="btn-small" onClick={() => { if (monthlyMonth === 1) { setMonthlyMonth(12); setMonthlyYear(y => y - 1) } else setMonthlyMonth(m => m - 1) }}>‹ 上月</button>
             <select value={monthlyYear} onChange={e => setMonthlyYear(Number(e.target.value))} style={{ width: 80 }}>
               {[monthlyYear - 1, monthlyYear, monthlyYear + 1].map(y => <option key={y} value={y}>{y}</option>)}
             </select>
             <select value={monthlyMonth} onChange={e => setMonthlyMonth(Number(e.target.value))} style={{ width: 60 }}>
               {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}月</option>)}
             </select>
+            <button className="btn-small" onClick={() => { if (monthlyMonth === 12) { setMonthlyMonth(1); setMonthlyYear(y => y + 1) } else setMonthlyMonth(m => m + 1) }}>下月 ›</button>
+            <select value={monthlyDeptFilter} onChange={e => setMonthlyDeptFilter(e.target.value)} style={{ width: 90 }}>
+              <option value="全部">全部部门</option>
+              {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
             <button className="btn-secondary" onClick={() => downloadCSV(
-              monthlySummary.map(s => ({ 姓名: s.name, 部门: s.department, 出勤天数: s.present, 迟到: s.late, 早退: s.early, 缺勤: s.absent, 请假: s.leave, 加班时长: s.overtimeHrs + 'h', 总记录: s.total })),
+              filteredMonthly.map(s => ({ 姓名: s.name, 部门: s.department, 出勤天数: s.present, 迟到: s.late, 早退: s.early, 缺勤: s.absent, 请假: s.leave, 加班时长: s.overtimeHrs + 'h', 总记录: s.total })),
               `月度汇总_${monthlyYear}年${monthlyMonth}月.csv`
             )}>导出CSV</button>
           </div>
@@ -1098,22 +1112,33 @@ export default function AdminDashboard() {
             <table>
               <thead>
                 <tr>
-                  <th>姓名</th><th>部门</th><th>出勤</th><th>迟到</th><th>早退</th><th>缺勤</th><th>请假</th><th>加班(h)</th>
+                  <th>姓名</th><th>部门</th><th>出勤</th><th>迟到</th><th>早退</th><th>缺勤</th><th>请假</th><th>加班(h)</th><th>出勤率</th>
                 </tr>
               </thead>
               <tbody>
-                {monthlySummary.map(s => (
+                {filteredMonthly.map(s => {
+                  const sRate = s.total > 0 ? Math.round(((s.present) / s.total) * 100) : 100
+                  const sColor = sRate >= 90 ? 'var(--success)' : sRate >= 70 ? 'var(--warning)' : 'var(--danger)'
+                  return (
                   <tr key={s.name}>
                     <td><strong>{s.name}</strong></td>
                     <td><span className="tag">{s.department}</span></td>
-                    <td><span style={{ color: '#5b8c5a', fontWeight: 600 }}>{s.present}</span></td>
-                    <td><span style={{ color: s.late > 0 ? '#d4a853' : undefined }}>{s.late}</span></td>
+                    <td><span style={{ color: 'var(--success)', fontWeight: 600 }}>{s.present}</span></td>
+                    <td><span style={{ color: s.late > 0 ? 'var(--warning)' : undefined }}>{s.late}</span></td>
                     <td><span style={{ color: s.early > 0 ? '#e8945a' : undefined }}>{s.early}</span></td>
-                    <td><span style={{ color: s.absent > 0 ? '#d35a4a' : undefined, fontWeight: s.absent > 0 ? 600 : undefined }}>{s.absent}</span></td>
+                    <td><span style={{ color: s.absent > 0 ? 'var(--danger)' : undefined, fontWeight: s.absent > 0 ? 600 : undefined }}>{s.absent}</span></td>
                     <td>{s.leave}</td>
                     <td>{s.overtimeHrs > 0 ? <strong style={{ color: '#5b7b8c' }}>{s.overtimeHrs}h</strong> : '-'}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ flex: 1, height: 5, borderRadius: 3, background: 'var(--glass-border)', overflow: 'hidden' }}>
+                          <div style={{ width: `${sRate}%`, height: '100%', borderRadius: 3, background: sColor, transition: 'width 0.4s ease' }} />
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: sColor, minWidth: 34, textAlign: 'right' }}>{sRate}%</span>
+                      </div>
+                    </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
@@ -1126,16 +1151,32 @@ export default function AdminDashboard() {
           if (reportStart && a.date < reportStart) return false
           if (reportEnd && a.date > reportEnd) return false
           if (reportEmployeeId && a.employee_id !== Number(reportEmployeeId)) return false
+          if (reportStatus && reportStatus !== '全部') {
+            if (reportStatus === '已打卡') return a.check_in || a.check_out
+            if (reportStatus === '未打卡') return !a.check_in && !a.check_out
+            return a.status === reportStatus
+          }
           return true
         }).sort((a, b) => b.date.localeCompare(a.date) || a.employee_id - b.employee_id)
 
         const reportLateCount = reportData.filter(a => a.status === 'late').length
         const reportAbsentCount = reportData.filter(a => a.status === 'absent').length
         const reportEarlyCount = reportData.filter(a => a.status === 'early_leave').length
+        const reportNormalCount = reportData.filter(a => a.status === 'normal').length
+        const reportLeaveCount = reportData.filter(a => a.status === 'leave').length
         const reportTotal = reportData.length || 1
 
         return (
           <div className="panel glass-panel">
+            {/* Summary cards */}
+            <div className="stats-cards" style={{ marginBottom: 14 }}>
+              <div className="stat-card"><div className="stat-label">总记录</div><div className="stat-number">{reportData.length}</div></div>
+              <div className="stat-card"><div className="stat-label">正常</div><div className="stat-number" style={{ color: 'var(--success)' }}>{reportNormalCount}</div></div>
+              <div className="stat-card"><div className="stat-label">迟到</div><div className="stat-number" style={{ color: reportLateCount > 0 ? 'var(--warning)' : undefined }}>{reportLateCount}</div></div>
+              <div className="stat-card"><div className="stat-label">缺勤</div><div className="stat-number" style={{ color: reportAbsentCount > 0 ? 'var(--danger)' : undefined }}>{reportAbsentCount}</div></div>
+              <div className="stat-card"><div className="stat-label">出勤率</div><div className="stat-number" style={{ color: Math.round(((reportTotal - reportAbsentCount - reportLeaveCount) / reportTotal) * 100) >= 90 ? 'var(--success)' : Math.round(((reportTotal - reportAbsentCount - reportLeaveCount) / reportTotal) * 100) >= 70 ? 'var(--warning)' : 'var(--danger)' }}>{Math.round(((reportTotal - reportAbsentCount - reportLeaveCount) / reportTotal) * 100)}%</div></div>
+            </div>
+
             <div className="panel-toolbar">
               <div className="report-filters">
                 <input type="date" value={reportStart} onChange={e => setReportStart(e.target.value)} />
@@ -1145,9 +1186,20 @@ export default function AdminDashboard() {
                   <option value="">全部员工</option>
                   {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                 </select>
+                <select value={reportStatus} onChange={e => setReportStatus(e.target.value)}>
+                  <option value="全部">全部状态</option>
+                  <option value="normal">正常</option>
+                  <option value="late">迟到</option>
+                  <option value="early_leave">早退</option>
+                  <option value="absent">缺勤</option>
+                  <option value="leave">请假</option>
+                  <option value="overtime">加班</option>
+                  <option value="已打卡">已打卡</option>
+                  <option value="未打卡">未打卡</option>
+                </select>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <span className="toolbar-info">{reportData.length} 条记录 · 迟到 {reportLateCount} · 早退 {reportEarlyCount} · 缺勤 {reportAbsentCount} · 出勤率 {Math.round(((reportTotal - reportAbsentCount) / reportTotal) * 100)}%</span>
+                <span className="toolbar-info">{reportData.length} 条 · 迟到 {reportLateCount} · 早退 {reportEarlyCount} · 缺勤 {reportAbsentCount}</span>
                 <button className="btn-secondary" onClick={() => downloadCSV(
                   reportData.map(a => {
                     const emp = employees.find(e => e.id === a.employee_id)
