@@ -27,22 +27,47 @@ export default function LoginPage() {
     setError('')
 
     try {
+      // 只按工号查询，不把明文密码传给数据库过滤
       const { data, error: queryError } = await supabase
         .from('employees')
         .select('*')
         .eq('employee_no', employeeNo)
-        .eq('password', password)
         .single()
 
-      if (queryError || !data) {
-        setError('员工号或密码错误')
+      if (queryError) {
+        if (queryError.code === 'PGRST116') {
+          setError('员工号不存在')
+        } else {
+          setError('查询失败: ' + queryError.message)
+        }
         setLoading(false)
         return
       }
 
-      localStorage.setItem('attendance_user', JSON.stringify(data))
+      // 客户端比对密码（支持明文和 bcrypt 哈希）
+      const dbPassword = data.password || ''
+      let passwordValid = false
 
-      if (data.role === 'admin') {
+      if (dbPassword.startsWith('$2') && dbPassword.length >= 56) {
+        // bcrypt 哈希密码
+        const bcryptjs = await import('bcryptjs')
+        passwordValid = await bcryptjs.compare(password, dbPassword)
+      } else {
+        // 明文密码
+        passwordValid = (password === dbPassword)
+      }
+
+      if (!passwordValid) {
+        setError('密码错误')
+        setLoading(false)
+        return
+      }
+
+      // 不把密码暴露到 localStorage
+      const { password: _, ...safeUser } = data
+      localStorage.setItem('attendance_user', JSON.stringify(safeUser))
+
+      if (safeUser.role === 'admin') {
         router.push('/')
       } else {
         router.push('/employee')
