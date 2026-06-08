@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabase'
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import Clock from '@/components/Clock'
 
 // ─── Types ───
 interface Employee {
@@ -278,6 +279,16 @@ export default function AdminDashboard() {
     }
     loadAll()
   }
+  async function deleteAttendance(id: number) {
+    if (!confirm('确定删除该考勤记录？此操作不可撤销。')) return
+    try {
+      const { error } = await supabase.from('attendance_records').delete().eq('id', id)
+      if (error) throw error
+      loadAll()
+    } catch (err: any) {
+      alert('删除失败: ' + (err.message || err))
+    }
+  }
 
   // ─── Leave CRUD ───
   async function saveLeave() {
@@ -524,6 +535,7 @@ export default function AdminDashboard() {
     <div className="app">
       <header className="header glass-panel">
         <h1>考勤管理系统</h1>
+        <Clock />
         <div className="header-actions">
           <button className="theme-toggle" onClick={() => setDarkMode(!darkMode)} title={darkMode ? '浅色模式' : '暗黑模式'}>{darkMode ? '☀' : '☾'}</button>
           {user && <span className="user-info">{user.name}</span>}
@@ -695,6 +707,7 @@ export default function AdminDashboard() {
                     <button className="btn-small" onClick={() => checkIn(emp.id)} disabled={!!rec?.check_in}>{rec?.check_in ? '已签到' : '签到'}</button>
                     <button className="btn-small" onClick={() => checkOut(emp.id)} disabled={!rec?.check_in || !!rec?.check_out}>{rec?.check_out ? '已签退' : '签退'}</button>
                     <button className="btn-small btn-danger" onClick={() => markAbsent(emp.id)}>缺勤</button>
+                    {rec && <button className="btn-small btn-danger" onClick={() => deleteAttendance(rec.id)}>删除</button>}
                   </div>
                 </div>
               )

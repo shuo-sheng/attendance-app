@@ -115,11 +115,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="test-accounts">
-          <p><strong>测试账号</strong></p>
-          <p>管理员：ADMIN001 / admin123</p>
-          <p>员工：EMP001 / 123456</p>
-        </div>
+
       </div>
     </div>
   )

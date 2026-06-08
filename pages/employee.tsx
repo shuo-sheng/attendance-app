@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabase'
+import Clock from '@/components/Clock'
 
 interface Employee {
   id: number
@@ -128,11 +129,12 @@ export default function EmployeePage() {
   async function handleCheckIn() {
     if (!user) return
     setCheckInLoading(true)
-    const now = new Date().toISOString()
-    const today = new Date().toISOString().split('T')[0]
-    const hour = new Date().getHours()
+    const d = new Date()
+    const now = d.toTimeString().split(' ')[0]
+    const today = d.toISOString().split('T')[0]
+    const hour = d.getHours()
     const status = hour >= 9 ? 'late' : 'normal'
-    const { data: existing } = await supabase.from('attendance_records').select('*').eq('employee_id', user.id).eq('date', today).single()
+    const { data: existing } = await supabase.from('attendance_records').select('*').eq('employee_id', user.id).eq('date', today).maybeSingle()
     if (existing) {
       await supabase.from('attendance_records').update({ check_in: now, status }).eq('id', existing.id)
     } else {
@@ -145,10 +147,11 @@ export default function EmployeePage() {
   async function handleCheckOut() {
     if (!user) return
     setCheckOutLoading(true)
-    const now = new Date().toISOString()
-    const today = new Date().toISOString().split('T')[0]
-    const hour = new Date().getHours()
-    const { data: existing } = await supabase.from('attendance_records').select('*').eq('employee_id', user.id).eq('date', today).single()
+    const d = new Date()
+    const now = d.toTimeString().split(' ')[0]
+    const today = d.toISOString().split('T')[0]
+    const hour = d.getHours()
+    const { data: existing } = await supabase.from('attendance_records').select('*').eq('employee_id', user.id).eq('date', today).maybeSingle()
     let status = existing?.status || 'normal'
     if (hour < 18 && status !== 'late') status = 'early_leave'
     if (existing) {
@@ -179,10 +182,21 @@ export default function EmployeePage() {
 
   async function submitMakeup() {
     if (!user || !makeupForm.date) return
-    await supabase.from('makeup_requests').insert({ employee_id: user.id, ...makeupForm, status: 'pending' })
+    await supabase.from('makeup_requests').insert({ employee_id: user.id, ...makeupForm, type: '补卡', status: 'pending' })
     setShowMakeupForm(false)
     setMakeupForm({ date: '', check_in: '', check_out: '', reason: '' })
     loadData()
+  }
+
+  async function deleteAttendance(id: number) {
+    if (!confirm('确定删除该考勤记录？此操作不可撤销。')) return
+    try {
+      const { error } = await supabase.from('attendance_records').delete().eq('id', id)
+      if (error) throw error
+      loadData()
+    } catch (err: any) {
+      alert('删除失败: ' + (err.message || err))
+    }
   }
 
   function logout() { localStorage.removeItem('attendance_user'); router.push('/login') }
@@ -218,6 +232,7 @@ export default function EmployeePage() {
             {user.department} · {user.position}
           </div>
         </div>
+        <Clock />
         <div className="header-actions">
           <span className="user-info">工号: {user.employee_no}</span>
           <button onClick={logout} className="btn-logout">退出</button>
@@ -381,6 +396,7 @@ export default function EmployeePage() {
                   <th>上班</th>
                   <th>下班</th>
                   <th>状态</th>
+                  <th>操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -393,6 +409,9 @@ export default function EmployeePage() {
                       <span className={`px-2 py-0.5 rounded-full text-xs ${STATUS_COLORS[record.status] || 'bg-gray-100'}`}>
                         {STATUS_LABELS[record.status] || record.status}
                       </span>
+                    </td>
+                    <td>
+                      <button className="btn-small btn-danger" onClick={() => deleteAttendance(record.id)}>删除</button>
                     </td>
                   </tr>
                 ))}

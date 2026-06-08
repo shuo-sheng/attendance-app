@@ -89,6 +89,21 @@ a:hover { text-decoration: underline; }
 .header-actions { display: flex; align-items: center; gap: 10px; }
 .user-info { font-size: 13px; color: var(--text-secondary); }
 
+/* ─── Clock ─── */
+.clock-display {
+  font-size: 13.5px; font-weight: 600; color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  padding: 6px 14px;
+  background: var(--glass-bg-lift);
+  border-radius: var(--radius-pill);
+  border: 0.5px solid var(--glass-border);
+}
+@media (max-width: 768px) {
+  .clock-display { font-size: 12px; padding: 4px 10px; }
+}
+
 /* ─── Glass Panel ─── */
 .glass-panel {
   background: var(--glass-bg);
