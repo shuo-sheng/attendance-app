@@ -211,6 +211,10 @@ export default function AdminDashboard() {
   async function saveContract() {
     if (!contractForm.employee_id || !contractForm.start_date) return
     const payload: any = { ...contractForm, employee_id: Number(contractForm.employee_id) }
+    // 空字符串转 null，避免 date 类型列拒绝空串
+    if (!payload.end_date) payload.end_date = null
+    if (!payload.file_url) payload.file_url = null
+    if (!payload.notes) payload.notes = null
     if (editingContract) {
       const { error } = await supabase.from('contracts').update(payload).eq('id', editingContract.id)
       if (error) { setError(error.message); return }
